@@ -74,6 +74,11 @@ test('cross-category comparison builds a shared analytical view with hierarchica
  const tableBeforeMode=await page.locator('#compare-table-body').textContent();
  await page.locator('[data-compare-mode="absolute"]').click();await expect(page.locator('[data-compare-mode="absolute"]')).toHaveAttribute('aria-pressed','true');
  expect(await page.locator('#compare-table-body').textContent()).toEqual(tableBeforeMode);
+ await parentInput.check();await expect(parentInput).toBeChecked();await expect(page.locator('#compare-unit-count')).toContainText('1');
+ const directChildren=await parentNode.evaluate(node=>[...node.querySelector('.compare-unit-children').children].map(child=>child.querySelector('.compare-unit-row [data-compare-unit]').dataset.compareUnit));
+ const hierarchyTable=page.locator('.compare-table-wrap table');await expect(hierarchyTable).toHaveClass(/detail-hierarchy-table/);await expect(page.locator('#compare-unit-breakdown-note')).toBeVisible();
+ const firstBlock=await page.locator('#compare-table-body').evaluate(body=>{const parent=body.querySelector('.detail-unit-parent'),date=parent.querySelector('.detail-unit-date'),span=Number(date.getAttribute('rowspan')),names=[];let row=parent.nextElementSibling;for(let i=1;i<span;i++,row=row.nextElementSibling)names.push(row.querySelector('.detail-unit-name').textContent.trim());return {parent:parent.querySelector('.detail-unit-name').textContent.trim(),span,names}});
+ const parentName=await parentInput.getAttribute('data-compare-unit');expect(firstBlock.parent).toContain(parentName);expect(firstBlock.span).toBe(directChildren.length+1);expect(firstBlock.names).toEqual(directChildren);
  await page.locator('[data-compare-chart="bar"]').click();await expect(page.locator('[data-compare-chart="bar"]')).toHaveAttribute('aria-pressed','true');
  await expect(page.locator('#compare-table-body tr').first()).toBeVisible();
  await expect(page.locator('.compare-table-panel')).toHaveClass(/panel/);await expect(page.locator('.compare-table-panel')).toHaveClass(/details-panel/);await expect(page.locator('.compare-table-wrap')).toHaveClass(/table-wrap/);
