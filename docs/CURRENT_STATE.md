@@ -1,6 +1,6 @@
 # Поточний стан
 
-Оновлено: **2026-09-12**. Етапи 1–5 завершені та злиті у `main`. Explicit hierarchy config та hierarchy row actions увійшли у `main`; останній користувацький commit `actual units` — `4263c4d`.
+Оновлено: **2026-09-12**. Етапи 1–5, hierarchy ordering/tree animation та detail unit breakdown інтегровані у стабільний `main`.
 
 ## Стабільний `main`
 
@@ -14,18 +14,15 @@
 - Playwright scopes: `core`, `sticky`, `charts`, `bps`, `units`; resource revision перевіряється окремо.
 - `ContourConfig.UNIT_HIERARCHY` у `js/contour-config.js` є єдиним джерелом parent-зв’язків **угруповання → АК → підрозділ**; порядок Excel та naming heuristic не створюють зв’язків.
 - `contour-units.js` відповідає за runtime-відображення дерева, expand/collapse, statuses та archive, але не визначає склад автоматично.
+- Дочірні вузли у hierarchy view відображаються нижче parent за `UNIT_HIERARCHY`, мають tree-branch і плавний expand/collapse з підтримкою `prefers-reduced-motion`.
 - Статуси `active / hidden / archived` зберігаються лише локально; архівування не змінює Excel або normalized records.
-- First-party resource revision у `main`: **33**.
-
-## Поточна робоча зміна
-
-- Гілка: `update_12`, створена від `main` commit `4263c4d`.
-- Рядки ГОЧ у hierarchy view перебудовуються за pre-order `UNIT_HIERARCHY`, тому підпорядковані вузли завжди відображаються нижче свого parent незалежно від порядку рядків Excel.
-- Видимі дочірні рядки мають tree-branch із вертикальними та горизонтальними сегментами відповідно до фактичної вкладеності конфігу.
-- `+ / −` лишається у вирівняному окремому слоті; назва відкриває штатні деталі.
-- Expand/collapse дочірніх рядків має плавний fade/slide, а `prefers-reduced-motion` вимикає JS-анімацію.
-- Видимі рядки перенумеровуються після hierarchy reorder/visibility changes; `data-row` та прив’язка деталей не змінюються.
-- Для цієї гілки first-party resource revision: **34**.
+- У detail-вікні ГОЧ батьківський вузол з прямими дітьми отримує поденну таблицю з колонкою «Підрозділ»: спочатку власний рядок parent, далі тільки його безпосередні діти з `UNIT_HIERARCHY`.
+- Глибші нащадки у detail-таблицю автоматично не підтягуються; parent і direct children читаються окремими `aggregate(..., group)` викликами, без сумування дітей у parent і без зміни normalized records.
+- Для leaf-вузла detail-таблиця лишається без hierarchy breakdown.
+- Hierarchy breakdown використовує ті самі базові стилі клітинок, типографіку та розділювачі, що й звичайна detail-таблиця; дочірній рівень позначається лише відступом назви.
+- `#detail-dialog` ущільнений: локальний `sheet-heading` має `margin-bottom: 10px` (`8px` на mobile), а line/bar перемикачі розташовані праворуч в одному горизонтальному блоці з `Тенденція + період`.
+- Browser test перевіряє direct children, компактний відступ заголовка detail-dialog і горизонтальне розташування trend controls.
+- First-party resource revision у `main`: **39**.
 
 ## Відкритий технічний борг
 
@@ -36,4 +33,4 @@
 
 ## Поточний фокус
 
-Перевірити hierarchy ordering, tree branch та expand/collapse animation на desktop/browser scenario. Не змінювати `UNIT_HIERARCHY`, Excel, aggregate math або інші компоненти поза цією UX-зміною.
+Активної незлитої зміни немає. Наступну задачу починати від актуального `main`; не змінювати `UNIT_HIERARCHY`, Excel schema, normalized records або aggregate math без прямої потреби задачі.

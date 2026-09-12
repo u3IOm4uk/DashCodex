@@ -50,7 +50,7 @@ test('explicit hierarchy config defines parents and leaves unknown rows unconfig
  expect(result.unconfigured).toEqual(['Shared']);
 });
 
-test('configured hierarchy renders below parent with branch and smooth expand collapse',async({page})=>{
+test('configured hierarchy renders below parent with branch, detail breakdown and smooth expand collapse',async({page})=>{
  await openDashboard(page);
  await page.evaluate(()=>{
    window.__unitAnimationCalls=0;
@@ -94,9 +94,29 @@ test('configured hierarchy renders below parent with branch and smooth expand co
  await expect(child).toBeVisible();
  await expect(child).not.toHaveClass(/unit-animating/);
 
+ const directChildren=await page.evaluate(name=>ContourUnits.catalog.index[name]?.children||[],parentName);
+ expect(directChildren.length).toBeGreaterThan(0);
  await parent.locator('.row-button').click();
  await expect(page.locator('#detail-dialog')).toBeVisible();
  await expect(page.locator('#detail-name')).toHaveText(parentName);
+ await expect(page.locator('#detail-dialog > .sheet-heading')).toHaveCSS('margin-bottom','10px');
+ const trendLayout=await page.locator('#detail-content .detail-trend').evaluate(trend=>{
+   const title=trend.querySelector('h3')?.getBoundingClientRect(),period=trend.querySelector('p')?.getBoundingClientRect(),controls=trend.querySelector('.detail-chart-controls')?.getBoundingClientRect();
+   return title&&period&&controls?{textTop:title.top,textBottom:period.bottom,textRight:Math.max(title.right,period.right),controlsTop:controls.top,controlsBottom:controls.bottom,controlsLeft:controls.left}:null;
+ });
+ expect(trendLayout).not.toBeNull();
+ expect(trendLayout.controlsTop).toBeLessThan(trendLayout.textBottom);
+ expect(trendLayout.controlsBottom).toBeGreaterThan(trendLayout.textTop);
+ expect(trendLayout.controlsLeft).toBeGreaterThan(trendLayout.textRight);
+ const detailTable=page.locator('#detail-content .detail-hierarchy-table');
+ await expect(detailTable).toBeVisible();
+ await expect(detailTable.locator('thead th').nth(1)).toHaveText('Підрозділ');
+ const firstDate=await detailTable.locator('tr.detail-unit-parent').first().getAttribute('data-detail-date');
+ expect(firstDate).toBeTruthy();
+ await expect(detailTable.locator(`tr.detail-unit-parent[data-detail-date="${firstDate}"]`)).toHaveAttribute('data-detail-unit',parentName);
+ const detailChildren=await detailTable.locator(`tr.detail-unit-child[data-detail-date="${firstDate}"]`).evaluateAll(rows=>rows.map(row=>row.dataset.detailUnit));
+ expect(detailChildren).toEqual(directChildren);
+ await expect(page.locator('#detail-content .detail-unit-note')).toContainText('лише безпосередньо підпорядковані');
  await page.locator('#detail-dialog .close-dialog').click();
 
  await page.locator('#unit-manage').click();
