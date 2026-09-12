@@ -108,6 +108,10 @@ Preset «Увесь період» може бути ширшим за manual UX
 
 `ContourCharts` формує chart options; `contour.js` володіє ApexCharts lifecycle. Сім drone cards мають локальні modes; multi-series details використовують окрему FPV axis при спільному показі.
 
+Мініграфіки мають `.mini-hover` із датами та значеннями; делегований pointer-handler показує спільний tooltip поза overflow-контейнерами. Мініграфіки не перехоплюють колесо.
+
+`ContourCharts.periodRange()` визначає календарне вікно в межах дат джерела. `mountPlotPeriod()` додає пресети й wheel-handler до основного/модального chart-host; події колеса об’єднуються перед оновленням графіка. `mainPlotWindow` та локальне вікно деталей не змінюють облікові `from/to`. Нові точки отримуються через чинний `aggregate()`; кеш/формули не змінені. AbortController і cleanup прибирають wheel-handler та таймер при rerender/закритті деталей.
+
 ## Імпорт, експорт і запуск
 
 - initial fetch — `APP_CONFIG.defaultWorkbook`; File API підтримує `.xlsx/.xls/.xlsm`;
