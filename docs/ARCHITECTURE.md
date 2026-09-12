@@ -7,9 +7,9 @@
 | Компонент | Відповідальність |
 |---|---|
 | `index.html` | Чинний DOM, доступні назви, підключення ресурсів, діалоги, шапка, dock і панелі |
-| `js/contour-config.js` | `APP_CONFIG`, `WORKBOOK_SCHEMA`, основні угруповання, source/date/performance policy |
+| `js/contour-config.js` | `APP_CONFIG`, `WORKBOOK_SCHEMA`, `UNIT_HIERARCHY`, source/date/performance policy |
 | `js/contour-data.js` | Workbook validation, parse/normalization, metadata, indexes/cache, aggregate, dates і comparisons |
-| `js/contour-units.js` | UI-каталог ГОЧ, conservative hierarchy inference, unit statuses, archive/expand behavior |
+| `js/contour-units.js` | Проєкція explicit hierarchy config на GOCh rows, unit statuses, archive/expand behavior |
 | `js/contour-view.js` | Pure escaping/format/date/icon helpers |
 | `js/contour-charts.js` | Pure ApexCharts option builders і mini-bar SVG |
 | `js/contour-navigation.js` | Targeted navigation adapter для category/sticky scroll behavior |
@@ -25,11 +25,13 @@
 
 Основний data flow: **Excel → SheetJS.read → validateWorkbook → parse/normalize → lazy indexes/cache → sections/categories → aggregate → UI**.
 
-Stage 5 додає окрему presentation-гілку після parse: **parsed GOCh records → ContourUnits.buildCatalog → hierarchy/status view → існуюча detail table**. Вона не змінює normalized records і не входить у aggregate math.
+Unit presentation-гілка після parse: **parsed GOCh records + `ContourConfig.UNIT_HIERARCHY` → `ContourUnits.buildCatalog` → hierarchy/status view → існуюча detail table**. Вона не змінює normalized records і не входить у aggregate math.
 
 ## Конфігурація та Excel-контракт
 
-`contour-config.js` — runtime source of truth для bundled workbook, import limit, source kinds, date policy, workbook sheets, summary keys, category/drone fields, canonical top-level groups і aggregate cache limit.
+`contour-config.js` — runtime source of truth для bundled workbook, import limit, source kinds, date policy, workbook sheets, summary keys, category/drone fields, explicit unit hierarchy і aggregate cache limit.
+
+`UNIT_HIERARCHY` є вкладеною структурою. Рівень визначається тільки вкладеністю: root = угруповання, перший рівень children = АК, глибші рівні = підрозділи. `GROUP_NAMES` формується з root-вузлів цієї структури.
 
 `validateWorkbook()` формує `errors`/`warnings`; critical incompatibility зупиняє `parse()` через `WorkbookValidationError`.
 
@@ -49,18 +51,15 @@ Safety cap може обмежити `days/series`, але `raw/rows/totals` з�
 
 `contour-units.js` підключається після `contour-data.js` і обгортає `ContourData.parse()`: після успішного parse будується окремий каталог з усіх GOCh records.
 
-Hierarchy inference:
+Parent-зв’язки не виводяться з Excel. `buildCatalog()` зіставляє точну назву row з `UNIT_HIERARCHY`:
 
-1. записи кожної дати впорядковуються за збереженим Excel row number;
-2. canonical name з `GROUP_NAMES` відкриває top-level group block;
-3. назва з шаблоном `АК` формує corps-level під поточним group;
-4. звичайні наступні rows прив’язуються до поточного corps або group;
-5. parent приймається тільки якщо для точної назви він однаковий у всіх спостереженнях;
-6. multi-parent case стає `ambiguous` root і не вгадується.
+1. конфігурація розгортається у map `name → parent/level/order`;
+2. вузли, присутні у GOCh і конфігурації, отримують тільки configured parent та level;
+3. Excel row order, шаблон `АК` та інші heuristics не використовуються для parent;
+4. назва, відсутня в `UNIT_HIERARCHY`, стає `unconfigured` root і явно позначається у UI;
+5. для bundled контрольної книги `units.spec.cjs` вимагає порожній `catalog.unconfigured`.
 
-Canonical `12 АК`, оскільки він уже top-level у `GROUP_NAMES`, лишається root попри збіг з corps naming heuristic.
-
-Ієрархія впливає тільки на представлення flat table: parent click toggles children, separate detail action викликає існуючий `showDetail()`. Батьківський numeric row не реконструюється з дітей.
+Ієрархія впливає тільки на представлення flat table. `+ / −` окремо керує expand/collapse, натискання назви викликає існуючі деталі. Батьківський numeric row не реконструюється з дітей.
 
 ## Unit status і локальна persistence
 
@@ -78,7 +77,7 @@ Overrides зберігаються у `localStorage` за ключем `contour.
 
 Runtime source metadata: `{kind,name}`. Filename не визначає bundled/user. Автоматично fetched workbook — `bundled`; File API — `user`.
 
-Data workbook після reload завантажується заново; unit visibility/archive preference є єдиною Stage 5 локальною persistence, зафіксованою окремим рішенням D26.
+Data workbook після reload завантажується заново; unit visibility/archive preference є локальною persistence, а hierarchy source є статичною конфігурацією репозиторію.
 
 ## Дати
 
@@ -116,7 +115,7 @@ Preset «Увесь період» може бути ширшим за manual UX
 - Excel formulas не перераховуються;
 - CSV: UTF-8 BOM, `;`, CRLF, null → empty field, formula-like prefixes escaped;
 - `Запустити.cmd` bind only `127.0.0.1:8080`;
-- Stage 5 first-party resource revision — **31**.
+- current branch first-party resource revision — **33**.
 
 ## Репозиторій і quality gate
 
@@ -131,6 +130,6 @@ Preset «Увесь період» може бути ширшим за manual UX
 
 ## Зони великого впливу
 
-Wide review потрібен для `WORKBOOK_SCHEMA`, aggregate/cache semantics, null/date policy, CSV, global sticky/responsive DOM, hierarchy inference rules або зміни meaning `active/hidden/archived`.
+Wide review потрібен для `WORKBOOK_SCHEMA`, aggregate/cache semantics, null/date policy, CSV, global sticky/responsive DOM, `UNIT_HIERARCHY` contract або зміни meaning `active/hidden/archived`.
 
 Велика книга все ще парситься у main thread; actual performance budget на target devices не встановлено.
