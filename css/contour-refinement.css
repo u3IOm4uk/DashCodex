@@ -99,15 +99,15 @@ main{padding-top:98px}
 #metrics .metric-card{flex-basis:218px}
 #metrics .metric-card-paired{flex-basis:360px;max-width:390px}
 #metrics .card-changes:empty{visibility:hidden}
-.cards-away #metrics .metric-card{flex-basis:210px;height:84px}
-.cards-away #metrics .metric-card-paired{flex-basis:350px}
+.cards-away #metrics .metric-card{flex-basis:166px;height:84px}
+.cards-away #metrics .metric-card-paired{flex-basis:264px}
 .cards-away #workspace-dock #metrics{height:98px}
 .cards-away #metrics .card-stats{height:auto}
 .cards-away #metrics .stat-value .change-badge{font-size:10px;opacity:1}
 
 
 
-@media(max-width:650px){#metrics .metric-card-paired,.cards-away #metrics .metric-card-paired{flex-basis:calc(100vw - 48px);max-width:342px}#metrics .stat-value{gap:4px}#metrics .stat-value strong{font-size:24px}#metrics .stat-value .change-badge{font-size:9px}#metrics .card-stats.paired>div+div{padding-left:7px}}
+@media(max-width:650px){#metrics .metric-card-paired{flex-basis:calc(100vw - 48px);max-width:342px}.cards-away #metrics .metric-card-paired{flex-basis:264px;max-width:264px}#metrics .stat-value{gap:4px}#metrics .stat-value strong{font-size:24px}#metrics .stat-value .change-badge{font-size:9px}#metrics .card-stats.paired>div+div{padding-left:7px}}
 @media(max-width:360px){#metrics .stat-value strong{font-size:21px}#metrics .card-stats.paired{gap:6px}#metrics .stat-value .change-badge{white-space:normal;line-height:12px}.cards-away #metrics .metric-card{height:92px}.cards-away #workspace-dock #metrics{height:106px}}
 
 /* One stable grid contracts with scroll; no alternate row or spacer. */
@@ -149,7 +149,7 @@ main{padding-top:98px}
 #drone-types .drone-select:focus-visible{outline:2px solid var(--type-color);outline-offset:3px;border-radius:3px}
 
 .detail-chart-controls{display:flex;gap:4px;justify-content:flex-end;margin:8px 0}.detail-chart-controls button{display:flex;align-items:center;justify-content:center;width:34px;height:32px;border:1px solid var(--line);border-radius:4px}.detail-chart-controls button[aria-pressed=true]{border-color:var(--gold);color:var(--gold)}
-.detail-chart-legend{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}.detail-chart-legend button{padding:7px 9px;border:1px solid var(--line);border-radius:4px;font-size:11px;text-align:left}.detail-chart-legend button:before{content:'';display:inline-block;width:7px;height:7px;background:var(--type-color);border-radius:2px;margin-right:6px}.detail-chart-legend button[aria-pressed=true]{border-color:var(--type-color);color:var(--type-color);background:#ffffff08}
+.detail-chart-legend{display:flex;flex-wrap:wrap;gap:8px 18px;margin:8px 0;padding:0 9px}.detail-chart-legend button{display:inline-flex;align-items:center;gap:6px;padding:2px 0;border:0;border-radius:0;background:transparent;color:#8e9a9f;font-size:11px;font-weight:400;text-align:left;line-height:1.5}.detail-chart-legend button:before{content:'';flex:0 0 8px;width:8px;height:8px;background:var(--type-color);border-radius:50%}.detail-chart-legend button[aria-pressed=false]{opacity:.45}.detail-chart-legend button:hover{color:var(--text)}
 
 /* FLIP moves the same cards into the final row and back to their grid positions. */
 #drone-types.drone-row .drone-type-grid{display:flex;flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;scrollbar-width:thin;scroll-snap-type:none}
@@ -171,3 +171,17 @@ main{padding-top:98px}
 @media(max-width:650px){.detail-drone-summary{grid-template-columns:1fr}#drone-types .drone-type{grid-template-columns:80px minmax(0,1fr) 28px}}
 
 #drone-types.drone-reflow .drone-type-grid{overflow:visible}
+
+
+/* Chart interaction remains independent of the accounting filters. */
+.mini-hover{display:block;width:100%;height:100%;min-width:0;cursor:crosshair}.mini-hover svg{pointer-events:none}
+#mini-tooltip{position:fixed;z-index:1000;pointer-events:none;max-width:min(330px,calc(100vw - 16px));border:1px solid #454d50;border-radius:5px;background:#191e22;box-shadow:0 5px 18px #0006;color:#e5e9ea;font-size:12px;line-height:1.5;padding:8px 10px}
+#mini-tooltip[hidden]{display:none}#mini-tooltip>div{color:#aab4b9;font-size:11px;margin-bottom:3px}#mini-tooltip i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px}#mini-tooltip strong{margin-left:8px;white-space:nowrap}
+.chart-period-controls{display:flex;align-items:center;flex-wrap:wrap;gap:5px 7px;padding:4px 22px 8px;color:var(--muted);font-size:11px}
+.chart-period-controls button{padding:5px 8px;border:1px solid var(--line);border-radius:4px;min-height:30px;font-size:11px}.chart-period-controls button[aria-pressed=true]{color:var(--gold);border-color:#85834e;background:#c2bd5110}.chart-period-controls small{font-size:10px}
+#detail-dialog .detail-trend{grid-template-areas:"title period controls" "range range range" "legend legend legend" "hint hint hint" "chart chart chart"}
+#detail-dialog .chart-period-controls{grid-area:range;padding:8px 0 4px}
+.cards-away #metrics .stat-value{gap:2px 5px}.cards-away #metrics .card-stats.paired{gap:6px}.cards-away #metrics .card-stats.paired>div+div{padding-left:7px}.cards-away #metrics .stat-value strong{font-size:22px}.cards-away #metrics .metric-top{white-space:normal;height:auto;min-height:16px;line-height:14px}
+@media(max-width:650px){.chart-period-controls{padding-inline:16px}.chart-period-controls small{display:none}#detail-dialog .detail-trend>h3{white-space:normal;max-width:130px}.cards-away #metrics .stat-value strong{font-size:21px}}
+@media(max-width:650px){#detail-dialog .detail-trend{grid-template-areas:"title title controls" "period period period" "range range range" "legend legend legend" "hint hint hint" "chart chart chart"}#detail-dialog .detail-trend>p:not(.detail-drone-note){white-space:normal;overflow:visible;margin-top:4px}}
+@media(max-width:360px){.cards-away #metrics .metric-card-paired{flex-basis:244px;max-width:244px}}

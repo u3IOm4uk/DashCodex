@@ -9,7 +9,7 @@ function temporalOptions({dataApi:D,aggregate:a,labels,colors,height=260,balance
  const o=baseOptions(reducedMotion),single=from===to,t=Date.parse(from+'T12:00:00Z');
  const series=balance?[{name:'Відновлено − втрачено',data:a.days.map((d,j)=>({x:Date.parse(d+'T12:00:00Z'),y:a.series.every(s=>s[j]!==null)?a.series[0][j]-a.series[1][j]:null}))}]:labels.map((name,i)=>({name,data:a.days.map((d,j)=>({x:Date.parse(d+'T12:00:00Z'),y:a.series[i][j]}))}));
  const limits=D.integerAxis(series.flatMap(s=>s.data.map(p=>p.y)),balance);
- return {...o,chart:{...o.chart,type:mode,height},series,colors:balance?[D.colors.green]:colors,
+ return {...o,chart:{...o.chart,type:mode,height,zoom:{enabled:false}},series,colors:balance?[D.colors.green]:colors,
  xaxis:{type:'datetime',labels:{datetimeUTC:true,formatter:(v,stamp)=>shortDate(new Date(stamp).toISOString().slice(0,10))},axisBorder:{show:false},axisTicks:{show:false},tooltip:{enabled:false}},
  yaxis:{...limits,forceNiceScale:false,labels:{formatter:v=>fmt(Math.round(v))}},
  fill:mode==='area'?{type:'gradient',gradient:{opacityFrom:.26,opacityTo:.02}}:{type:'solid',opacity:.9},
@@ -23,6 +23,16 @@ function miniBar({dataApi:D,values,color,days,selectedDay=null,fmt,fullDate}){
  return `<svg viewBox="0 0 220 58" preserveAspectRatio="none" role="img" aria-label="Динаміка стовпчиками"><line x1="0" x2="220" y1="${zero}" y2="${zero}" stroke="#65716c" opacity=".4"/>${values.map((v,i)=>v===null?'':`<rect x="${i*step+step*.15}" y="${Math.min(y(v),zero)}" width="${Math.max(1,step*.7)}" height="${Math.max(1,Math.abs(y(v)-zero))}" rx="1" fill="${color}"><title>${fullDate(days[i])}: ${fmt(v)}</title></rect>`).join('')}${selectedIndex>=0?`<line x1="${(selectedIndex+.5)*step}" x2="${(selectedIndex+.5)*step}" y1="0" y2="58" stroke="#c2bd51" stroke-dasharray="3 3"/>`:''}</svg>`;
 }
 
-root.ContourCharts={modeLabel,baseOptions,temporalOptions,miniBar};
+// Resize the visible calendar window; never modify the accounting period.
+function periodRange(dates,range,count,anchor=.5){
+ const day=864e5,stamp=d=>Date.parse(d+'T12:00:00Z'),iso=t=>new Date(t).toISOString().slice(0,10);
+ const min=stamp(dates[0]),max=stamp(dates.at(-1)),start=stamp(range.from),end=stamp(range.to);
+ const length=Math.max(1,Math.min(4001,Math.round(count),Math.round((max-min)/day)+1));
+ const pivot=start+(end-start)*Math.max(0,Math.min(1,anchor));
+ const left=Math.max(min,Math.min(max-(length-1)*day,Math.round((pivot-min)/day-(length-1)*anchor)*day+min));
+ return {from:iso(left),to:iso(left+(length-1)*day)};
+}
+
+root.ContourCharts={modeLabel,baseOptions,temporalOptions,miniBar,periodRange};
 if(typeof module!=='undefined')module.exports=root.ContourCharts;
 })(typeof window!=='undefined'?window:globalThis);
