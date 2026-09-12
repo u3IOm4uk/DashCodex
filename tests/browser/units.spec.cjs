@@ -6,6 +6,10 @@ async function openDashboard(page){
  await expect(page.locator('#table-body .row-button').first()).toBeVisible();
 }
 
+async function rowIndexBy(page,key,value,visibleOnly=false){
+ return page.locator('#table-body tr').evaluateAll((rows,args)=>rows.findIndex(row=>row.dataset[args.key]===args.value&&(!args.visibleOnly||!row.hidden)),{key,value,visibleOnly});
+}
+
 test('unit hierarchy expands and archived rows keep historical details',async({page})=>{
  await openDashboard(page);
  const parent=page.locator('#table-body tr.unit-parent').first();
@@ -14,20 +18,25 @@ test('unit hierarchy expands and archived rows keep historical details',async({p
  expect(parentName).toBeTruthy();
  await parent.locator('.row-button').click();
  await expect(parent.locator('.unit-expand')).toHaveAttribute('aria-expanded','true');
- const child=page.locator(`#table-body tr[data-unit-parent="${parentName.replace(/"/g,'\\"')}"]:visible`).first();
+ const childIndex=await rowIndexBy(page,'unitParent',parentName,true);
+ expect(childIndex).toBeGreaterThan(-1);
+ const child=page.locator('#table-body tr').nth(childIndex);
  await expect(child).toBeVisible();
  const childName=await child.getAttribute('data-unit-name');
  expect(childName).toBeTruthy();
 
  await page.locator('#unit-manage').click();
  await expect(page.locator('#unit-manager-dialog')).toBeVisible();
- const status=page.locator('#unit-manager-list [data-unit-status]').filter({has:page.locator(`option`)}).and(page.locator(`[data-unit-status="${childName.replace(/"/g,'\\"')}"]`));
- await status.selectOption('archived');
+ await page.getByLabel(`Статус: ${childName}`).selectOption('archived');
  await page.locator('#unit-manager-dialog .unit-manager-close').click();
- await expect(page.locator(`#table-body tr[data-unit-name="${childName.replace(/"/g,'\\"')}"]`)).toBeHidden();
+ let currentIndex=await rowIndexBy(page,'unitName',childName,false);
+ expect(currentIndex).toBeGreaterThan(-1);
+ await expect(page.locator('#table-body tr').nth(currentIndex)).toBeHidden();
 
  await page.locator('#unit-archive-toggle').click();
- const archived=page.locator(`#table-body tr[data-unit-name="${childName.replace(/"/g,'\\"')}"]`);
+ currentIndex=await rowIndexBy(page,'unitName',childName,true);
+ expect(currentIndex).toBeGreaterThan(-1);
+ const archived=page.locator('#table-body tr').nth(currentIndex);
  await expect(archived).toBeVisible();
  await expect(archived).toHaveClass(/unit-status-archived/);
  await archived.locator('.row-button').click();
