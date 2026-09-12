@@ -1,59 +1,46 @@
 # Поточний стан
 
-Оновлено: **2026-09-12**. Етап 2 — reliability foundation — перевірено користувачем і злитий у `main` squash-комітом `c5e1cbe`. Етап 3 — performance & maintainability — виконується у гілці `refactor/performance-maintainability`, draft PR #3. Офіційного semver немає; активні first-party CSS/JS у цій гілці мають cache revision **30**.
+Оновлено: **2026-09-12**. Етап 3 — performance & maintainability — перевірено користувачем і злитий у `main` squash-комітом `142a43f`. Етап 4 — change-scoped quality automation — виконується у гілці `test/change-scoped-quality`.
 
 ## Реалізовано в `main`
 
-- Статичний `index.html`, три активні CSS-шари, локальні SheetJS/ApexCharts, Excel/шрифти/зображення; backend і persistence відсутні.
-- Чотири розділи, імпорт/CSV, дати, картки, часові графіки, структура, таблиці, діалоги й попередження якості.
-- Парні показники СОУ/противник і втрачено/відновлено; територіальний баланс; FPV відокремлений від інших типів БпС.
-- Контекст обраної доби до 30 днів не змінює підсумки періоду.
-- Один sticky-ряд категорій без копій/spacer; responsive drawer і нижня мобільна навігація.
-- `js/contour-config.js` централізує runtime/workbook config, source kinds і date policy.
-- `validateWorkbook()` виконується до `parse()`: критичні структурні помилки блокують імпорт, некритичні відсутні поля формують warnings.
-- Джерело має окремі `{kind, name}`; filename не визначає тип джерела.
-- ApexCharts має видимий error-state, а generation guard відсікає застарілий основний render.
-- Репозиторій очищено від legacy MVC/Dexie, ручних версій, дубля `xlsx.js`, старого `css.css` і непідключеного Bootstrap; `Запустити.cmd` переносимий.
+- Статичний локальний dashboard без backend/persistence; runtime не потребує npm/build-system.
+- `contour-config.js` централізує runtime/workbook config, source kinds і date policy.
+- `validateWorkbook()` виконується до `parse()`; critical errors блокують імпорт, warnings відображаються користувачу.
+- `source.kind` відділений від filename.
+- `aggregate()` для parsed models використовує lazy indexes і bounded LRU cache; імпорти ізольовані.
+- `contour-view.js` і `contour-charts.js` винесені як pure helpers; state/DOM orchestration лишаються в `contour.js`.
+- Legacy sidebar і старий donut host прибрані.
+- Sticky-категорії при зміні категорії у compact-режимі залишаються pinned/compact; переміщується лише контент під ними.
+- Partial distribution із `null` пояснюється явно; null не прирівнюється до нуля.
+- Видимий доступ до «Джерело» є на desktop/tablet і mobile.
 
-## Етап 3 — реалізовано в робочій гілці
+## Етап 4 — робоча гілка
 
-- `aggregate()` для моделей, створених `parse()`, використовує lazy indexes за date/group/type та LRU-кеш повторних запитів. Новий імпорт створює новий data-object і автоматично отримує ізольований cache.
-- `performanceStats()` і `clearPerformanceCaches()` дають read-only діагностику cache/index поведінки для regression/profiling.
-- Safety cap серії не змінює стару семантику `raw/rows/totals`: навіть при обрізаному календарному `days` підсумки рахуються за повним запитаним діапазоном джерела.
-- Із `contour.js` винесені pure helpers: `contour-view.js` відповідає за escaping/format/date/icon, `contour-charts.js` — за chart options і mini-bar SVG. State, DOM orchestration та events залишаються у `contour.js`.
-- Прихований legacy sidebar і старий `#distribution-chart` вилучені з DOM та JS-залежностей. Мобільна навігація використовує чинний dialog.
-- «Джерело» має видиму кнопку в desktop/tablet top-status; на малих екранах використовується існуюча нижня кнопка.
-- Якщо структура показника містить `null`, UI пояснює, що частки рахуються лише за наявними числовими значеннями і пропуски не прирівнюються до нуля.
-- First-party CSS/JS query revisions вирівняні на `v=30`.
-- Regression script розширено перевірками cache hit/miss, ізоляції нового імпорту, full-range totals за series cap та pure view/chart helpers.
+- Додано `.github/workflows/quality.yml`.
+- Додано `scripts/quality-scope.cjs`, який визначає перевірки за зміненими файлами та їх diff.
+- Syntax check запускається лише для змінених first-party JS.
+- Adapter regression запускається для schema/data/aggregate/workbook changes.
+- Playwright browser tests поділені на `core`, `sticky`, `charts`, `bps`.
+- БпС-test запускається лише при БпС/FPV/drone-related diff або зміні самої test infrastructure.
+- Docs-only changes не запускають runtime/browser tests.
+- `package.json` і Playwright є dev/test tooling; production runtime не змінений і не потребує npm.
 
 ## Git/GitHub
 
 - Канонічний репозиторій: `u3IOm4uk/DashCodex`.
 - Базова гілка: `main`.
-- Поточна робоча гілка: `refactor/performance-maintainability`.
-- Draft PR: **#3 — Stage 3: performance and maintainability**.
-- Значущі зміни виконуються в окремих гілках; merge у `main` — лише після потрібного regression-проходу.
+- Поточна робоча гілка: `test/change-scoped-quality`.
+- Значущі зміни виконуються через окрему гілку/PR.
 
-## Статус перевірок
+## Відомі відкриті задачі
 
-- Stage 2 локальні перевірки користувач підтвердив перед merge.
-- Для Stage 3 проведено code/diff/patch review; `contour.js` декомпозовано без зміни state/event-flow.
-- `.audit/verify-contour.cjs` зберігає попередні snapshot-значення та містить нові Stage 3 checks.
-- Автоматичного CI/browser-suite поки немає, тому **Stage 3 лишається draft до локального FULL проходу**.
-- Перед merge потрібні `node --check` для `contour-config.js`, `contour-data.js`, `contour-view.js`, `contour-charts.js`, `contour.js`, запуск `.audit/verify-contour.cjs` і browser regression на desktop/tablet/mobile.
-
-## Відомі обмеження й технічний борг
-
-- Базові CSS-файли ще містять частину правил для вже видаленого legacy DOM та історичні overrides; функціональну залежність від sidebar/donut-host уже прибрано, але глибоке каскадне чищення T05 не завершене.
-- `contour.js` став меншим за відповідальністю, але все ще володіє state, DOM render, navigation, dialogs, import/export і scroll orchestration; подальша декомпозиція має бути лише за реальною потребою.
-- Продуктивність великої реальної книги ще не виміряна на цільових пристроях; cache/index logic покрита regression checks, але T08 потребує окремого профілювання.
-- Одиниця територій не підтверджена; у вартості ОВгП є помилки джерела; формули Excel не перераховуються.
-- Acceptance policy все ще вимагає заповнений ГОЧ або ОВгП; книга лише з персоналом/БК не проходить імпорт.
-- Повного автоматичного browser-suite і CI поки немає — це scope Етапу 4.
+- T05: глибше CSS-cascade cleanup після стабілізації automated browser coverage.
+- T08: фактичне профілювання великої книги та фізичних/альтернативних браузерів.
+- T16: централізований resource revision/cache busting без build-system.
+- Acceptance policy книги лише з персоналом/БК не розширена.
+- Одиниця територій не підтверджена; формули Excel не перераховуються.
 
 ## Поточний фокус
 
-Завершити review/документацію Stage 3 та передати draft PR #3 на локальний FULL regression. Глибоке CSS-cascade cleanup виконувати лише після browser-перевірки поточного DOM cleanup; CI і browser automation залишаються наступним етапом.
-
-Документація працює як continuity layer між сесіями: базовий контекст — `AGENTS.md` + цей файл + релевантний код; тематичні документи читаються й оновлюються лише за потреби. Перевірки виконуються за рівнями LOW/NORMAL/FULL із `TESTING.md`.
+Завершити Stage 4 quality infrastructure, перевірити сам workflow у draft PR і після стабілізації використовувати change-scoped CI як стандартний merge gate.
