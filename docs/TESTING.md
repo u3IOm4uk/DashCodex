@@ -18,90 +18,93 @@ python -m http.server 8080 --bind 127.0.0.1
 
 Для тексту, локального CSS, невеликої функції без зміни контракту даних або глобального layout.
 
-Мінімум:
-
-- перевірити зачеплений сценарій;
-- за зміни JS — відповідний `node --check`;
-- за локальної UI-правки — один релевантний viewport;
-- документаційна правка без runtime-змін не потребує runtime-тестів.
+Мінімум: зачеплений сценарій; для JS — відповідний `node --check`; для локальної UI-правки — один релевантний viewport.
 
 ### NORMAL
 
 Для логіки компонента, кількох пов’язаних файлів, локальної responsive-поведінки або графіків.
 
-Мінімум:
-
-- синтаксична перевірка змінених JS-файлів;
-- релевантні функціональні сценарії;
-- 1–2 viewport, якщо зміна залежить від ширини;
-- `node .audit/verify-contour.cjs`, якщо зачеплено схему Excel, агрегацію, дати, поля, порівняння, FPV/типи або validation.
+Мінімум: синтаксис змінених JS, релевантні сценарії, 1–2 viewport за потреби та `node .audit/verify-contour.cjs`, якщо зачеплено Excel contract, aggregate, dates, comparison, FPV/типи, validation або pure chart/view helpers.
 
 ### FULL
 
-Для архітектури, моделі даних, імпорту/експорту, великих рефакторингів або змін із широким ризиком регресій.
+Для архітектури, моделі даних, імпорту/експорту, performance/cache, декомпозиції runtime або глобального DOM/layout cleanup.
 
-Базовий набір для активного runtime:
+Базовий Stage 3 gate:
 
 ```sh
 node --check js/contour-config.js
 node --check js/contour-data.js
+node --check js/contour-view.js
+node --check js/contour-charts.js
 node --check js/contour.js
 node .audit/verify-contour.cjs
 ```
 
-Для глобальних UI/layout-змін — три viewport-ревізії: приблизно 1440×1000, 1024×768 і 390×844. Не запускати три viewport механічно, якщо зміна не зачіпає responsive/layout.
+Якщо змінено глобальний DOM/navigation/responsive — три viewport: приблизно **1440×1000**, **1024×768**, **390×844**.
 
-## Regression contract Stage 2
+## Regression contract даних
 
-`node .audit/verify-contour.cjs` має завершитися exit 0 і перевіряє одночасно старі контрольні результати та новий reliability layer.
+`.audit/verify-contour.cjs` має завершитися exit 0. Він перевіряє:
 
-Обов’язкові класи перевірок:
+- реальна `Накопичення.xlsx` проходить validation без critical errors;
+- контрольні totals/series/null/0 і сім типів БпС не змінені;
+- критично несумісна книга дає `WorkbookValidationError`, warning-only книга лишається допустимою;
+- включну date policy, contextRange, comparison і adaptive axes;
+- safety cap series не обрізає `raw/rows/totals` повного from/to;
+- parsed data використовує lazy indexes і aggregate cache;
+- однаковий aggregate повторно дає cache hit без повторного index build;
+- новий `parse()` отримує ізольований порожній cache;
+- pure `ContourView`/`ContourCharts` зберігають escaping/date formatting, single-day marker і reduced-motion option.
 
-- реальна `Накопичення.xlsx` проходить `validateWorkbook()` без critical errors;
-- зберігаються контрольні totals/series/null/0 та сім типів БпС;
-- порожня книга відхиляється;
-- ГОЧ із даними без `ВСЬОГО за СО:` відхиляється з `ops-summary`;
-- `parse()` для критично несумісної книги кидає `WorkbookValidationError`;
-- `from === to` = 1 календарний день;
-- ручний інтервал у межах 366 включних днів приймається, довший — відхиляється;
-- aggregate понад safety cap повертає `truncated: true`;
-- contextRange зберігає 30-денне вікно з корекцією на межах;
-- стара математика comparison/axis лишається незмінною.
+`performanceStats()` використовується лише як regression/profiling diagnostic. Не прив'язувати до нього UI.
 
-## Browser smoke для Stage 2
+## Browser regression Stage 3
 
-Перед merge reliability-гілки перевірити щонайменше:
+Перед merge PR #3 перевірити:
 
-1. Bundled `Накопичення.xlsx` автоматично завантажується як **ТЕСТОВІ ДАНІ**.
-2. Ручний імпорт файлу з тією самою назвою `Накопичення.xlsx` показується як **ІМПОРТОВАНІ ДАНІ** — classification залежить від `source.kind`, а не filename.
-3. Несумісна книга не замінює поточну модель і дає конкретне повідомлення validation.
-4. Книга з warning, але без critical error, завантажується; warning видно в notice та «Про джерело».
-5. Ручний діапазон: одна дата, 366 включних днів і перевищення межі.
-6. Швидке перемикання категорій/line-bar не дозволяє старому async chart render перекрити актуальний графік.
-7. Якщо ApexCharts render штучно/фактично падає, chart host показує видимий error-state, а таблиця й числа залишаються доступними.
-8. Детальний графік БпС: line/bar, зміна легенди, закриття Escape і повторне відкриття.
+1. Bundled книга автоматично завантажується, ручний імпорт працює, provenance bundled/user не змінилась.
+2. Desktop/tablet: кнопка «Джерело» видима у top-status і відкриває source dialog.
+3. Phone: top-status прихований; «Джерело» доступне через нижню мобільну навігацію.
+4. Розділи/категорії працюють після видалення legacy sidebar; dialog navigation і `#inline-sections` залишаються функціональними.
+5. Sticky metrics: той самий ряд стискається/розгортається, drag не спричиняє click, активна картка не губиться.
+6. Структура показника не залежить від старого `#distribution-chart`; смуги/підписи/відсотки рендеряться як раніше.
+7. Якщо частина distribution values = `null`, з'являється примітка про розрахунок лише за наявними числами; null не стає 0.
+8. Area/bar основного графіка, territory dynamics/balance, single-day marker і chart error-state не регресують.
+9. БпС: сім карток, локальні line/bar, detail chart, multi-select legend і окрема FPV axis.
+10. Dialogs: source/detail/navigation, Escape, повторне відкриття й швидкі перемикання.
+11. Перевірити відсутність горизонтального page overflow на трьох viewport.
+
+## Performance smoke
+
+Цей етап не декларує конкретний millisecond budget без вимірювання. Для великої книги порівнювати принаймні:
+
+- перший render після імпорту — очікувані cache misses/index builds;
+- повторний render того самого зрізу — мають з'являтися aggregate hits;
+- після нового імпорту — попередні entries не повинні переноситися в нову модель.
+
+Для фактичних time/memory цифр використовується окремий profiling task T08; не підміняти regression cache counters заявою про реальне прискорення на всіх пристроях.
 
 ## Сценарії за зачепленим модулем
 
-- **Категорії/sticky:** стискання й розгортання того самого ряду, відсутність spacer/клонів, видимість активної картки, drag без випадкового click.
-- **Дати:** доба/діапазон, перетин меж, рівність дат, неповні дані, контекст графіка не змінює підсумок.
-- **Території:** баланс, нульова лінія, перемикання «Динаміка / Баланс».
-- **БпС:** FPV та шість інших типів, незалежні масштаби, локальні line/bar, деталі й легенда.
-- **Діалоги:** відкриття/закриття, Escape, фокус, повторні швидкі перемикання графіків.
-- **Імпорт/validation:** valid/error/warning, bundled/user provenance, 30 MiB limit.
+- **Категорії/sticky:** один ряд, без spacer/клонів, active visibility, drag/click.
+- **Дати:** доба/діапазон, межі, рівність дат, неповні дані, context не змінює totals.
+- **Території:** balance, zero line, dynamics/balance.
+- **БпС:** FPV + шість типів, масштаби, line/bar, details/legend.
+- **Діалоги:** open/close, Escape, focus, rapid chart changes.
+- **Імпорт/validation:** valid/error/warning, bundled/user, 30 MiB limit.
+- **Структура/null:** partial percentages + explicit note.
 - **CSV:** тільки якщо зміна торкається експорту.
-- **Доступність/анімація:** reduced motion, клавіатурний фокус, доступні назви кнопок.
+- **Доступність/анімація:** reduced motion, keyboard focus, accessible names.
 
-## Автоматичний адаптерний тест
+## Додаткові інструменти
 
-`.audit/verify-contour.cjs` використовує локальний SheetJS і читає книгу без запису. Він не є browser test: DOM/ApexCharts interactions перевіряються окремо.
-
-`.audit/workbook_profile.py` — додатковий read-only профіль через openpyxl. Використовувати лише для задач джерела/структури книги.
+`.audit/workbook_profile.py` — read-only профіль книги через openpyxl; використовувати для задач структури/джерела або T08.
 
 ## Технічні зауваження
 
-- Після зміни кешованого JS переконайся, що браузер завантажив актуальний `?v=`; Stage 2 runtime використовує revision 29.
+- Активні first-party CSS/JS у Stage 3 мають revision **30**; після зміни перевірити, що браузер не тримає старий ресурс.
 - Скріншот одразу після кліку може показувати попередній кадр; дочекайся завершення DOM/анімації.
-- Timeout браузерного інструмента сам по собі не доводить помилку застосунку.
-- Viewport-симуляція не є тестом на фізичному пристрої.
-- Не записуй сюди результати кожного проходу; актуальний короткий статус — у `CURRENT_STATE.md`.
+- Timeout browser tool сам по собі не доводить помилку застосунку.
+- Viewport simulation не є тестом на фізичному пристрої.
+- Результати кожного проходу не накопичувати тут; короткий актуальний статус — у `CURRENT_STATE.md`.
