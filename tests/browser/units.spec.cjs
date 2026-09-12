@@ -10,6 +10,32 @@ async function rowIndexBy(page,key,value,visibleOnly=false){
  return page.locator('#table-body tr').evaluateAll((rows,args)=>rows.findIndex(row=>row.dataset[args.key]===args.value&&(!args.visibleOnly||!row.hidden)),{key,value,visibleOnly});
 }
 
+test('hierarchy inference keeps stable parents and rejects ambiguous ones',async({page})=>{
+ await openDashboard(page);
+ const result=await page.evaluate(()=>{
+   const [groupA,groupB]=ContourConfig.GROUP_NAMES;
+   const sheet=ContourConfig.WORKBOOK_SCHEMA.sheets.ops;
+   const records=[
+    {date:'2026-01-01',row:1,group:groupA},{date:'2026-01-01',row:2,group:'15 АК'},{date:'2026-01-01',row:3,group:'Unit A'},{date:'2026-01-01',row:4,group:groupB},{date:'2026-01-01',row:5,group:'Unit B'},{date:'2026-01-01',row:6,group:'Shared'},
+    {date:'2026-01-02',row:1,group:groupA},{date:'2026-01-02',row:2,group:'15 АК'},{date:'2026-01-02',row:3,group:'Unit A'},{date:'2026-01-02',row:4,group:'Shared'},{date:'2026-01-02',row:5,group:groupB},{date:'2026-01-02',row:6,group:'Unit B'}
+   ];
+   const catalog=ContourUnits.buildCatalog({sheets:{[sheet]:{records}}});
+   return {
+    groupA,
+    corpsParent:catalog.index['15 АК']?.parent,
+    unitParent:catalog.index['Unit A']?.parent,
+    unitBParent:catalog.index['Unit B']?.parent,
+    sharedParent:catalog.index.Shared?.parent,
+    sharedAmbiguous:catalog.index.Shared?.ambiguous
+   };
+ });
+ expect(result.corpsParent).toBe(result.groupA);
+ expect(result.unitParent).toBe('15 АК');
+ expect(result.unitBParent).toBe(ContourConfigFallback=false?null:null);
+ expect(result.sharedParent).toBeNull();
+ expect(result.sharedAmbiguous).toBe(true);
+});
+
 test('unit hierarchy expands and archived rows keep historical details',async({page})=>{
  await openDashboard(page);
  const parent=page.locator('#table-body tr.unit-parent').first();
