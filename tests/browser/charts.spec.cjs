@@ -51,3 +51,55 @@ test('wheel and presets resize only the chart, retain modes, and reset with filt
  await page.locator('#table-body .row-button').first().click();const detail=page.locator('#detail-trend-chart');await expect(detail).toBeVisible();
  const table=await page.locator('#detail-content table').textContent();await page.locator('#detail-dialog [data-plot-days="7"]').click();await expect(detail).toHaveAttribute('data-plot-from','2026-09-01');await detail.hover();await page.mouse.wheel(0,120);await expect(detail).not.toHaveAttribute('data-plot-from','2026-09-01');expect(await page.locator('#detail-content table').textContent()).toEqual(table);
 });
+
+test('cross-category comparison builds a shared analytical view with hierarchical unit scope',async({page})=>{
+ await page.goto('/');await expect(page.locator('#trend-chart')).toBeVisible({timeout:15000});
+ await page.locator('#compare-open').click();await expect(page.locator('#compare-dialog')).toBeVisible();
+ const categories=page.locator('#compare-catalog .compare-category');expect(await categories.count()).toBeGreaterThan(0);expect(await categories.evaluateAll(nodes=>nodes.every(node=>!node.open))).toBe(true);
+ await categories.first().locator('summary').click();await expect(categories.first().locator('[data-compare-metric]').first()).toBeVisible({timeout:15000});
+ await expect(page.locator('#compare-chart .apexcharts-canvas')).toBeVisible({timeout:15000});
+ const checked=page.locator('#compare-catalog [data-compare-metric]:checked');expect(await checked.count()).toBeGreaterThanOrEqual(2);
+ const [metricsBox,workspaceBox,unitsBox]=await Promise.all([page.locator('.compare-metrics-panel').boundingBox(),page.locator('.compare-workspace').boundingBox(),page.locator('.compare-units-panel').boundingBox()]);
+ expect(metricsBox.x+metricsBox.width).toBeLessThanOrEqual(workspaceBox.x+1);expect(unitsBox.x).toBeGreaterThanOrEqual(workspaceBox.x+workspaceBox.width-1);
+ await expect(page.locator('#compare-units-all')).toHaveAttribute('aria-pressed','true');
+ const parentToggle=page.locator('#compare-unit-tree [data-unit-toggle]').first(),parentRow=parentToggle.locator('xpath=..'),parentNode=parentRow.locator('xpath=..'),parentInput=parentRow.locator('[data-compare-unit]');
+ await parentInput.check();await expect(parentInput).toBeChecked();await expect(parentToggle).toHaveAttribute('aria-expanded','true');
+ const children=parentNode.locator('.compare-unit-children [data-compare-unit]');expect(await children.count()).toBeGreaterThanOrEqual(2);await expect(children.first()).toBeVisible();
+ const childNames=await children.evaluateAll(nodes=>nodes.slice(0,2).map(input=>input.parentElement.textContent.trim()));
+ await children.first().check();await expect(parentInput).not.toBeChecked();await expect(children.first()).toBeChecked();
+ await children.nth(1).check();await expect(page.locator('#compare-unit-count')).toContainText('2');await expect(page.locator('#compare-data-note')).toContainText('Серії сумуються');
+ await expect(page.locator('#compare-data-note')).toContainText('Нормалізація');
+ await expect(page.locator('#compare-table-head')).toContainText('Підрозділ');await expect(page.locator('#compare-table-body')).toContainText(childNames[0]);await expect(page.locator('#compare-table-body')).toContainText(childNames[1]);
+ await expect(page.locator('#compare-table-foot')).toContainText('Абсолютні значення джерела');
+ const tableBeforeMode=await page.locator('#compare-table-body').textContent();
+ await page.locator('[data-compare-mode="absolute"]').click();await expect(page.locator('[data-compare-mode="absolute"]')).toHaveAttribute('aria-pressed','true');
+ expect(await page.locator('#compare-table-body').textContent()).toEqual(tableBeforeMode);
+ await parentInput.check();await expect(parentInput).toBeChecked();await expect(page.locator('#compare-unit-count')).toContainText('1');
+ const directChildren=await parentNode.evaluate(node=>[...node.querySelector('.compare-unit-children').children].map(child=>child.querySelector('.compare-unit-row [data-compare-unit]').dataset.compareUnit));
+ const hierarchyTable=page.locator('.compare-table-wrap table');await expect(hierarchyTable).toHaveClass(/detail-hierarchy-table/);await expect(page.locator('#compare-unit-breakdown-note')).toBeVisible();
+ const firstBlock=await page.locator('#compare-table-body').evaluate(body=>{const parent=body.querySelector('.detail-unit-parent'),date=parent.querySelector('.detail-unit-date'),span=Number(date.getAttribute('rowspan')),names=[];let row=parent.nextElementSibling;for(let i=1;i<span;i++,row=row.nextElementSibling)names.push(row.dataset.detailUnit);return {parent:parent.dataset.detailUnit,span,names}});
+ const parentName=await parentInput.getAttribute('data-compare-unit');expect(firstBlock.parent).toBe(parentName);expect(firstBlock.span).toBe(directChildren.length+1);expect(firstBlock.names).toEqual(directChildren);
+ await page.locator('[data-compare-chart="bar"]').click();await expect(page.locator('[data-compare-chart="bar"]')).toHaveAttribute('aria-pressed','true');
+ await expect(page.locator('#compare-table-body tr').first()).toBeVisible();
+ await expect(page.locator('.compare-table-panel')).toHaveClass(/panel/);await expect(page.locator('.compare-table-panel')).toHaveClass(/details-panel/);await expect(page.locator('.compare-table-wrap')).toHaveClass(/table-wrap/);
+ const detailWrapStyle=await page.locator('#analysis-grid .details-panel .table-wrap').evaluate(el=>{const s=getComputedStyle(el);return {maxHeight:s.maxHeight,overflowX:s.overflowX,overflowY:s.overflowY}}),compareWrapStyle=await page.locator('.compare-table-wrap').evaluate(el=>{const s=getComputedStyle(el);return {maxHeight:s.maxHeight,overflowX:s.overflowX,overflowY:s.overflowY}});expect(compareWrapStyle).toEqual(detailWrapStyle);
+ const dashboardFrom=await page.locator('#from').inputValue(),dashboardTo=await page.locator('#to').inputValue();await page.locator('#compare-dashboard-period').click();await expect(page.locator('#compare-from')).toHaveValue(dashboardFrom);await expect(page.locator('#compare-to')).toHaveValue(dashboardTo);
+});
+
+test('comparison action keeps mobile navigation and opens filters only by buttons',async({page})=>{
+ await page.goto('/');await expect(page.locator('#trend-chart')).toBeVisible({timeout:15000});
+ await expect(page.locator('.section-nav-row > #compare-open')).toBeVisible();
+ await expect(page.locator('.analysis-tools #compare-open')).toHaveCount(0);
+ await page.setViewportSize({width:390,height:844});
+ const nav=page.locator('.mobile-nav');
+ await expect(nav).toBeVisible();await expect(page.locator('#mobile-overview')).toBeVisible();await expect(page.locator('#mobile-menu')).toBeVisible();await expect(page.locator('#mobile-compare')).toBeVisible();await expect(page.locator('#mobile-dates')).toBeHidden();await expect(page.locator('#mobile-source')).toBeHidden();
+ await page.locator('#mobile-compare').click();
+ const dialog=page.locator('#compare-dialog');await expect(dialog).toBeVisible();await expect(nav).toBeVisible();expect(await dialog.evaluate(el=>el.matches(':modal'))).toBe(false);
+ const [dialogBox,navBox]=await Promise.all([dialog.boundingBox(),nav.boundingBox()]);expect(dialogBox.y+dialogBox.height).toBeLessThanOrEqual(navBox.y+1);
+ await expect(page.locator('.compare-mobile-pickers')).toBeVisible();await expect(page.locator('.compare-metrics-panel')).toBeHidden();await expect(page.locator('.compare-units-panel')).toBeHidden();
+ await page.locator('label[for="compare-mobile-metrics-toggle"]').click();await expect(page.locator('.compare-metrics-panel')).toBeVisible();await expect(page.locator('#compare-catalog .compare-category[open]')).toHaveCount(0);
+ const metricsBox=await page.locator('.compare-metrics-panel').boundingBox();expect(metricsBox.x).toBeGreaterThanOrEqual(0);expect(metricsBox.x+metricsBox.width).toBeLessThanOrEqual(391);
+ await page.locator('label[for="compare-mobile-metrics-toggle"]').click();await expect(page.locator('.compare-metrics-panel')).toBeHidden();
+ await page.locator('label[for="compare-mobile-units-toggle"]').click();await expect(page.locator('.compare-units-panel')).toBeVisible();const unitsBox=await page.locator('.compare-units-panel').boundingBox();expect(unitsBox.x+unitsBox.width).toBeLessThanOrEqual(391);
+ await page.locator('#mobile-overview').click();await expect(dialog).toBeHidden();await expect(nav).toBeVisible();
+});
