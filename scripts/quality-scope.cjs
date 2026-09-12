@@ -17,6 +17,7 @@ const patches=files.filter(file=>/^(js\/|css\/|index\.html$)/.test(file)).map(fi
 const changed=re=>files.some(file=>re.test(file));
 const patch=re=>re.test(patches);
 const testInfra=changed(/^(\.github\/workflows\/quality\.yml|scripts\/quality-scope\.cjs|playwright\.config\.cjs|package\.json)$/);
+const resourceVersion=changed(/^(index\.html|scripts\/resource-version\.cjs)$/);
 const regression=testInfra||changed(/^(js\/contour-(config|data)\.js|\.audit\/verify-contour\.cjs|Накопичення\.xlsx)$/);
 const browserCore=testInfra||changed(/^(index\.html|css\/contour.*\.css|js\/contour(?:-view|-navigation|-charts)?\.js|tests\/browser\/core\.spec\.cjs)$/)||regression;
 const browserSticky=testInfra||changed(/^(js\/contour-navigation\.js|tests\/browser\/sticky\.spec\.cjs)$/)||patch(/cards-away|workspace-dock|dockScroll|selectCategory|followCategory|scrollTo|sticky|rail-heading|#metrics/i);
@@ -24,11 +25,12 @@ const browserBps=testInfra||changed(/^(css\/contour-detail\.css|tests\/browser\/
 const browserCharts=testInfra||changed(/^(js\/contour-charts\.js|tests\/browser\/charts\.spec\.cjs)$/)||patch(/ApexCharts|chart|temporalOptions|miniBar|axisRange|integerAxis|graph-tabs|data-chart/i);
 const syntaxFiles=files.filter(firstPartyJs);
 const syntax=syntaxFiles.length>0;
-const scope={base,head,files,syntax,syntaxFiles,regression,browserCore,browserSticky,browserBps,browserCharts,testInfra};
+const scope={base,head,files,syntax,syntaxFiles,resourceVersion,regression,browserCore,browserSticky,browserBps,browserCharts,testInfra};
 console.log(JSON.stringify(scope,null,2));
 if(process.env.GITHUB_OUTPUT){
  const lines=[
   `syntax=${syntax}`,
+  `resource_version=${resourceVersion}`,
   `regression=${regression}`,
   `browser_core=${browserCore}`,
   `browser_sticky=${browserSticky}`,
