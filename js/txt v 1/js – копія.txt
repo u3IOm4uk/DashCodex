@@ -1,0 +1,24 @@
+/**
+ * @version 1.0.0
+ * @dependencies dexie.js, xlsx.js, apexcharts.js
+ */
+
+document.addEventListener("DOMContentLoaded", () => {
+    //(dexie.js)
+    const DB = new Dexie("dashBoardTest");
+    // TODO: якщо немає бази даних то створити (або видати відповідне повідомлення)
+    //(model.js)
+    const Model = new Models(DB);
+    //(view.js)
+    const View = new Views();
+    //(controller.js)
+    const Controller = new Controllers(Model, View);
+
+    // Запуск обробників
+    
+    
+});
+
+window.addEventListener("load", () => {
+    
+});
