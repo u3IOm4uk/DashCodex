@@ -31,7 +31,9 @@ test('explicit hierarchy config defines parents and leaves unknown rows unconfig
    return {
     groupA,groupB,
     corpsParent:catalog.index['15 АК']?.parent,
+    corpsDepth:catalog.index['15 АК']?.depth,
     unitParent:catalog.index['Unit A']?.parent,
+    unitDepth:catalog.index['Unit A']?.depth,
     unitBParent:catalog.index['Unit B']?.parent,
     sharedParent:catalog.index.Shared?.parent,
     sharedUnconfigured:catalog.index.Shared?.unconfigured,
@@ -39,17 +41,23 @@ test('explicit hierarchy config defines parents and leaves unknown rows unconfig
    };
  });
  expect(result.corpsParent).toBe(result.groupA);
+ expect(result.corpsDepth).toBe(1);
  expect(result.unitParent).toBe('15 АК');
+ expect(result.unitDepth).toBe(2);
  expect(result.unitBParent).toBe(result.groupB);
  expect(result.sharedParent).toBeNull();
  expect(result.sharedUnconfigured).toBe(true);
  expect(result.unconfigured).toEqual(['Shared']);
 });
 
-test('configured hierarchy expands and the name opens details',async({page})=>{
+test('configured hierarchy renders below parent with branch and smooth expand collapse',async({page})=>{
  await openDashboard(page);
- expect(await page.evaluate(()=>ContourUnits.catalog.unconfigured)).toEqual([]);
- const parent=page.locator('#table-body tr.unit-parent').first();
+ await page.evaluate(()=>{
+   window.__unitAnimationCalls=0;
+   const original=Element.prototype.animate;
+   Element.prototype.animate=function(...args){window.__unitAnimationCalls++;return original.apply(this,args)};
+ });
+ const parent=page.locator('#table-body tr.unit-parent:visible').first();
  await expect(parent).toBeVisible();
  const parentName=await parent.getAttribute('data-unit-name');
  expect(parentName).toBeTruthy();
@@ -61,12 +69,30 @@ test('configured hierarchy expands and the name opens details',async({page})=>{
 
  await parent.locator('.unit-expand').click();
  await expect(parent.locator('.unit-expand')).toHaveAttribute('aria-expanded','true');
+ await expect.poll(()=>page.evaluate(()=>window.__unitAnimationCalls)).toBeGreaterThan(0);
+ const parentIndex=await rowIndexBy(page,'unitName',parentName,true);
  const childIndex=await rowIndexBy(page,'unitParent',parentName,true);
- expect(childIndex).toBeGreaterThan(-1);
+ expect(childIndex).toBeGreaterThan(parentIndex);
  const child=page.locator('#table-body tr').nth(childIndex);
  await expect(child).toBeVisible();
  const childName=await child.getAttribute('data-unit-name');
+ const childDepth=Number(await child.getAttribute('data-unit-depth'));
  expect(childName).toBeTruthy();
+ expect(childDepth).toBeGreaterThan(0);
+ await expect(child.locator('.unit-branch')).toBeVisible();
+ expect(await child.locator('.unit-branch-segment').count()).toBe(childDepth);
+ await expect(child.locator('.unit-branch-segment.current')).toHaveCount(1);
+ await expect(child).not.toHaveClass(/unit-animating/);
+
+ const beforeCollapse=await page.evaluate(()=>window.__unitAnimationCalls);
+ await parent.locator('.unit-expand').click();
+ await expect.poll(()=>page.evaluate(()=>window.__unitAnimationCalls)).toBeGreaterThan(beforeCollapse);
+ await expect(child).toBeHidden();
+ await expect(parent.locator('.unit-expand')).toHaveAttribute('aria-expanded','false');
+
+ await parent.locator('.unit-expand').click();
+ await expect(child).toBeVisible();
+ await expect(child).not.toHaveClass(/unit-animating/);
 
  await parent.locator('.row-button').click();
  await expect(page.locator('#detail-dialog')).toBeVisible();
