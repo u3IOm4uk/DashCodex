@@ -1,6 +1,6 @@
 # Поточний стан
 
-Оновлено: **2026-09-12**. Етапи 1–5 завершені та злиті у `main`. Оновлення hierarchy ordering/tree animation з гілки `update_12` злиті у `main` squash-комітом `48120d5`.
+Оновлено: **2026-09-12**. Етапи 1–5, hierarchy ordering/tree animation та detail unit breakdown інтегровані у стабільний `main`.
 
 ## Стабільний `main`
 
@@ -16,20 +16,13 @@
 - `contour-units.js` відповідає за runtime-відображення дерева, expand/collapse, statuses та archive, але не визначає склад автоматично.
 - Дочірні вузли у hierarchy view відображаються нижче parent за `UNIT_HIERARCHY`, мають tree-branch і плавний expand/collapse з підтримкою `prefers-reduced-motion`.
 - Статуси `active / hidden / archived` зберігаються лише локально; архівування не змінює Excel або normalized records.
-- First-party resource revision у `main`: **34**.
-
-## Поточна робоча зміна
-
-- Гілка: `feature/detail-unit-breakdown`, створена від актуального `main`.
-- Для деталей ГОЧ батьківський вузол з прямими дітьми отримує поденну таблицю з колонкою «Підрозділ»: спочатку власний рядок parent, далі тільки його безпосередні діти з `UNIT_HIERARCHY`.
-- Глибші нащадки не підтягуються в таблицю автоматично.
-- Батьківські та дочірні значення читаються окремими `aggregate(..., group)` викликами; дочірні рядки не сумуються в parent і не змінюють normalized records.
+- У detail-вікні ГОЧ батьківський вузол з прямими дітьми отримує поденну таблицю з колонкою «Підрозділ»: спочатку власний рядок parent, далі тільки його безпосередні діти з `UNIT_HIERARCHY`.
+- Глибші нащадки у detail-таблицю автоматично не підтягуються; parent і direct children читаються окремими `aggregate(..., group)` викликами, без сумування дітей у parent і без зміни normalized records.
 - Для leaf-вузла detail-таблиця лишається без hierarchy breakdown.
 - Hierarchy breakdown використовує ті самі базові стилі клітинок, типографіку та розділювачі, що й звичайна detail-таблиця; дочірній рівень позначається лише відступом назви.
-- Вертикальні проміжки у `#detail-dialog` між заголовком, вступом, summary/trend, поясненням і таблицею ущільнені без зміни розміру клітинок таблиці.
-- `#detail-dialog > .sheet-heading` має локальний `margin-bottom: 10px` (`8px` на mobile), а перемикачі line/bar розташовані праворуч в одному горизонтальному блоці з `Тенденція + період`.
-- Поточний browser test перевіряє direct children, компактний відступ заголовка detail-dialog і горизонтальне розташування trend controls.
-- Для цієї гілки first-party resource revision: **38**.
+- `#detail-dialog` ущільнений: локальний `sheet-heading` має `margin-bottom: 10px` (`8px` на mobile), а line/bar перемикачі розташовані праворуч в одному горизонтальному блоці з `Тенденція + період`.
+- Browser test перевіряє direct children, компактний відступ заголовка detail-dialog і горизонтальне розташування trend controls.
+- First-party resource revision у `main`: **39**.
 
 ## Відкритий технічний борг
 
@@ -40,4 +33,4 @@
 
 ## Поточний фокус
 
-Перевірити detail breakdown для батьківського та leaf-вузла change-scoped browser test. Не змінювати `UNIT_HIERARCHY`, Excel schema, normalized records або aggregate math.
+Активної незлитої зміни немає. Наступну задачу починати від актуального `main`; не змінювати `UNIT_HIERARCHY`, Excel schema, normalized records або aggregate math без прямої потреби задачі.
