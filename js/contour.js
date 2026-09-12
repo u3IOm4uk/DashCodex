@@ -1,7 +1,7 @@
 (async function(){
 'use strict';
 const D=ContourData,C=ContourConfig,$=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
-const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c]));
+const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fmt=v=>v===null||v===undefined?'—':new Intl.NumberFormat('uk-UA',{maximumFractionDigits:2}).format(v);
 const shortDate=d=>d?d.slice(8)+'.'+d.slice(5,7):'—';
 const fullDate=d=>d?shortDate(d)+'.'+d.slice(0,4):'—';
@@ -69,7 +69,6 @@ function renderDroneTypes(){
  const cat=droneCategory(r),a=D.aggregate(data,section,cat,from,to),prev=D.aggregate(data,section,cat,D.shift(from,-a.days.length),D.shift(from,-1)),range=D.contextRange(data.sheets[section.sheet].dates,from,to),plot=D.aggregate(data,section,cat,range.from,range.to),days=plot.days,raw=plot.series[0],mode=droneModes[r.id]||'area';cache.set(r.id,{r,days,raw});
  return `<article class="drone-type ${category.droneType===r.id?'active':''}" style="--type-color:${r.color}" data-drone-card="${r.id}"><button class="drone-select" data-drone="${r.id}" aria-pressed="${category.droneType===r.id}"><span class="drone-type-name">${esc(r.name)}</span><span class="drone-type-number"><span>${fmt(r.value)}</span>${changeBadge(a,prev,0)}</span></button><div class="drone-mini" title="Автомасштаб; вісь може не починатися з нуля">${miniChart(raw,r.color,mode,days)}</div><div class="drone-chart-modes" aria-label="Графік: ${esc(r.name)}">${['area','bar'].map(m=>`<button data-mini="${r.id}" data-mode="${m}" aria-label="${esc(r.name)}: ${modeLabel(m)}" aria-pressed="${mode===m}">${icon(m==='area'?'trend':'bars')}</button>`).join('')}</div></article>`;
  }).join('')}</div><p class="drone-source-note">Зміни % — до попереднього періоду. Автомасштаб; вісь може не починатися з нуля.${difference!==null&&Math.abs(difference)>.00001?' Сума типів не збігається із загальним підсумком.':difference===null?' Для звірки типів бракує даних.':''}</p>`;
- const grid=panel.querySelector('.drone-type-grid');if(grid)grid.scrollLeft=previousScroll;
  $$('[data-drone]').forEach(b=>b.onclick=()=>{category=droneCategory(b.dataset.drone==='other'?{id:'other'}:D.droneTypes.find(t=>t.id===b.dataset.drone));distributionIndex=0;render();$('[data-drone="'+b.dataset.drone+'"]').focus({preventScroll:true})});
  $$('[data-mini]').forEach(b=>b.onclick=()=>{const id=b.dataset.mini,mode=b.dataset.mode,item=cache.get(id),card=b.closest('.drone-type');droneModes[id]=mode;card.querySelector('.drone-mini').innerHTML=miniChart(item.raw,item.r.color,mode,item.days);card.querySelectorAll('[data-mini]').forEach(x=>x.setAttribute('aria-pressed',x===b));});
  $('#drone-overview').onclick=()=>{category=droneCategory({id:'other'});distributionIndex=0;render()};
