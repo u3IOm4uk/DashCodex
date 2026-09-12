@@ -22,7 +22,7 @@
 - Hierarchy breakdown використовує ті самі базові стилі клітинок, типографіку та розділювачі, що й звичайна detail-таблиця; дочірній рівень позначається лише відступом назви.
 - `#detail-dialog` ущільнений: локальний `sheet-heading` має `margin-bottom: 10px` (`8px` на mobile), а line/bar перемикачі розташовані праворуч в одному горизонтальному блоці з `Тенденція + період`.
 - Browser test перевіряє direct children, компактний відступ заголовка detail-dialog і горизонтальне розташування trend controls.
-- First-party resource revision у `main`: **39**.
+- First-party resource revision у `main`: **40**.
 
 ## Відкритий технічний борг
 
