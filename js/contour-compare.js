@@ -13,7 +13,8 @@ if(!button||!dialog)return;
 
 let model=null,sourceName=C.APP_CONFIG.defaultWorkbook,sourceKind=C.APP_CONFIG.sourceKinds.BUNDLED;
 let catalog=[],selected=new Set(DEFAULT_SELECTION),chart=null,chartType='area',valueMode='normalized';
-let range={from:null,to:null},bounds={from:null,to:null},unit='';
+let range={from:null,to:null},bounds={from:null,to:null};
+const selectedUnits=new Set(),expandedUnits=new Set(),openCategories=new Set();
 
 const dayStamp=day=>Date.parse(day+'T12:00:00Z');
 const clamp=(value,min,max)=>value<min?min:value>max?max:value;
@@ -21,8 +22,11 @@ const daysBetween=(from,to)=>{const rows=[];for(let day=from;day<=to;day=D.shift
 const mobileComparison=()=>matchMedia('(max-width:650px)').matches;
 function syncMobileDialogOffset(){const nav=$('.mobile-nav'),height=nav?.getBoundingClientRect().height||64;dialog.style.setProperty('--compare-mobile-nav-height',height+'px')}
 
-function flattenUnits(nodes,out=[]){for(const node of nodes||[]){out.push(node.name);flattenUnits(node.children,out)}return out}
-const unitNames=[...new Set(flattenUnits(C.UNIT_HIERARCHY))];
+const unitMeta=new Map();
+function indexUnits(nodes,parent=null,depth=0){for(const node of nodes||[]){unitMeta.set(node.name,{node,parent,depth});indexUnits(node.children,node.name,depth+1)}}
+indexUnits(C.UNIT_HIERARCHY);
+function descendantNames(name,out=[]){const meta=unitMeta.get(name);for(const child of meta?.node.children||[]){out.push(child.name);descendantNames(child.name,out)}return out}
+function ancestorNames(name){const out=[];let parent=unitMeta.get(name)?.parent;while(parent){out.push(parent);parent=unitMeta.get(parent)?.parent}return out}
 
 function modelBounds(){
  const dates=D.sections(model).flatMap(section=>model.sheets[section.sheet]?.dates||[]).sort();
@@ -84,21 +88,47 @@ function renderShell(){
  if(!model)return;
  $('#compare-source-note').textContent=`Джерело: ${sourceName}${sourceKind===C.APP_CONFIG.sourceKinds.BUNDLED?' · тестова книга':' · імпортована книга'}`;
  const from=$('#compare-from'),to=$('#compare-to');from.min=to.min=bounds.from;from.max=to.max=bounds.to;from.value=range.from;to.value=range.to;
- $('#compare-unit').innerHTML='<option value="">Загальний підсумок</option>'+unitNames.map(name=>`<option value="${esc(name)}">${esc(name)}</option>`).join('');$('#compare-unit').value=unit;
- renderCatalog();syncButtons();renderAnalysis();
+ renderCatalog();renderUnitTree();syncButtons();renderAnalysis();
 }
 
 function renderCatalog(){
  const host=$('#compare-catalog'),sections=new Map();
- for(const item of catalog){if(!sections.has(item.section.id))sections.set(item.section.id,{name:item.sectionName,categories:new Map()});const sec=sections.get(item.section.id);if(!sec.categories.has(item.categoryName))sec.categories.set(item.categoryName,[]);sec.categories.get(item.categoryName).push(item)}
- host.innerHTML=[...sections.values()].map(sec=>`<details class="compare-section" open><summary>${esc(sec.name)}</summary>${[...sec.categories.entries()].map(([name,items])=>`<div class="compare-category"><h4>${esc(name)}</h4>${items.map(item=>{const checked=selected.has(item.id),disabled=!checked&&selected.size>=MAX_SERIES;return `<label class="compare-metric ${disabled?'is-disabled':''}"><input type="checkbox" data-compare-metric="${esc(item.id)}" ${checked?'checked':''} ${disabled?'disabled':''}><span>${esc(item.name)}</span><small>${esc(item.unit||'од.')}${item.supportsUnit?'':' · загальний'}</small></label>`}).join('')}</div>`).join('')}</details>`).join('');
+ for(const item of catalog){
+  if(!sections.has(item.section.id))sections.set(item.section.id,{id:item.section.id,name:item.sectionName,categories:new Map()});
+  const sec=sections.get(item.section.id),key=`${item.section.id}:${item.categoryName}`;
+  if(!sec.categories.has(key))sec.categories.set(key,{name:item.categoryName,items:[]});sec.categories.get(key).items.push(item);
+ }
+ host.innerHTML=[...sections.values()].map(sec=>`<section class="compare-section-group"><h4>${esc(sec.name)}</h4>${[...sec.categories.entries()].map(([key,group])=>`<details class="compare-category" data-compare-category-key="${esc(key)}" ${openCategories.has(key)?'open':''}><summary>${esc(group.name)}<span>${group.items.length}</span></summary><div class="compare-category-items">${group.items.map(item=>{const checked=selected.has(item.id),disabled=!checked&&selected.size>=MAX_SERIES;return `<label class="compare-metric ${disabled?'is-disabled':''}"><input type="checkbox" data-compare-metric="${esc(item.id)}" ${checked?'checked':''} ${disabled?'disabled':''}><span>${esc(item.name)}</span><small>${esc(item.unit||'од.')}${item.supportsUnit?'':' · загальний'}</small></label>`}).join('')}</div></details>`).join('')}</section>`).join('');
  $('#compare-selected-count').textContent=`${selected.size} / ${MAX_SERIES}`;
+ host.querySelectorAll('[data-compare-category-key]').forEach(node=>node.addEventListener('toggle',()=>{const key=node.dataset.compareCategoryKey;if(node.open)openCategories.add(key);else openCategories.delete(key)}));
  host.querySelectorAll('[data-compare-metric]').forEach(input=>input.addEventListener('change',()=>{
   const id=input.dataset.compareMetric;
   if(input.checked){if(selected.size>=MAX_SERIES){input.checked=false;setMessage(`Одночасно можна відобразити до ${MAX_SERIES} показників.`);return}selected.add(id)}else selected.delete(id);
   setMessage(selected.size?`Обрано ${selected.size} показник${selected.size===1?'':selected.size<5?'и':'ів'}.`:'Оберіть хоча б один показник.');renderCatalog();renderAnalysis();
  }));
 }
+
+function unitNodeHtml(node,depth=0){
+ const children=node.children||[],hasChildren=children.length>0,expanded=expandedUnits.has(node.name),checked=selectedUnits.has(node.name);
+ return `<div class="compare-unit-node" style="--unit-depth:${depth}"><div class="compare-unit-row">${hasChildren?`<button type="button" class="compare-unit-toggle" data-unit-toggle="${esc(node.name)}" aria-label="${expanded?'Згорнути':'Розгорнути'} ${esc(node.name)}" aria-expanded="${expanded}">${expanded?'⌄':'›'}</button>`:'<span class="compare-unit-toggle-spacer"></span>'}<label><input type="checkbox" data-compare-unit="${esc(node.name)}" ${checked?'checked':''}><span>${esc(node.name)}</span></label></div>${hasChildren?`<div class="compare-unit-children" ${expanded?'':'hidden'}>${children.map(child=>unitNodeHtml(child,depth+1)).join('')}</div>`:''}</div>`;
+}
+
+function renderUnitTree(){
+ const host=$('#compare-unit-tree');host.innerHTML=C.UNIT_HIERARCHY.map(node=>unitNodeHtml(node)).join('');
+ const all=$('#compare-units-all'),count=$('#compare-unit-count');all.setAttribute('aria-pressed',String(selectedUnits.size===0));all.classList.toggle('is-active',selectedUnits.size===0);count.textContent=selectedUnits.size?`${selectedUnits.size} обр.`:'Усі';
+ host.querySelectorAll('[data-unit-toggle]').forEach(control=>control.addEventListener('click',()=>{const name=control.dataset.unitToggle;if(expandedUnits.has(name))expandedUnits.delete(name);else expandedUnits.add(name);renderUnitTree()}));
+ host.querySelectorAll('[data-compare-unit]').forEach(input=>input.addEventListener('change',()=>{
+  const name=input.dataset.compareUnit;
+  if(input.checked){
+   for(const ancestor of ancestorNames(name))selectedUnits.delete(ancestor);
+   for(const descendant of descendantNames(name))selectedUnits.delete(descendant);
+   selectedUnits.add(name);if(unitMeta.get(name)?.node.children?.length)expandedUnits.add(name);
+  }else selectedUnits.delete(name);
+  renderUnitTree();renderAnalysis();
+ }));
+}
+
+$('#compare-units-all')?.addEventListener('click',()=>{selectedUnits.clear();renderUnitTree();renderAnalysis()});
 
 function syncButtons(){
  dialog.querySelectorAll('[data-compare-chart]').forEach(node=>node.setAttribute('aria-pressed',String(node.dataset.compareChart===chartType)));
@@ -112,13 +142,18 @@ function normalized(values){
 }
 
 function selectedItems(){const map=new Map(catalog.map(item=>[item.id,item]));return [...selected].map(id=>map.get(id)).filter(Boolean)}
-function unitFor(item){return item.supportsUnit&&unit?unit:undefined}
+function unitScopeLabel(){const names=[...selectedUnits];if(!names.length)return 'Загальний підсумок';if(names.length<=2)return names.join(' + ');return `Обрано підрозділів: ${names.length}`}
+function rawForItem(item,days){
+ if(!item.supportsUnit||!selectedUnits.size){const aggregate=D.aggregate(model,item.section,item.category,range.from,range.to);return aggregate.series[item.index]||days.map(()=>null)}
+ const scoped=[...selectedUnits].map(name=>{const aggregate=D.aggregate(model,item.section,item.category,range.from,range.to,name);return aggregate.series[item.index]||days.map(()=>null)});
+ if(scoped.length===1)return scoped[0];
+ return days.map((_,index)=>{const values=scoped.map(series=>series[index]);return values.some(value=>value===null||value===undefined)?null:values.reduce((sum,value)=>sum+value,0)});
+}
 
 function analysisRows(){
  const days=daysBetween(range.from,range.to),items=selectedItems();let unavailable=0,missing=0;
  const series=items.map((item,colorIndex)=>{
-  const aggregate=D.aggregate(model,item.section,item.category,range.from,range.to,unitFor(item));
-  const raw=aggregate.series[item.index]||days.map(()=>null);missing+=raw.filter(value=>value===null).length;
+  const raw=rawForItem(item,days);missing+=raw.filter(value=>value===null).length;
   const transformed=valueMode==='normalized'?normalized(raw):{values:raw,baseline:null};if(valueMode==='normalized'&&transformed.baseline===null)unavailable++;
   return {item,color:SERIES_COLORS[colorIndex%SERIES_COLORS.length],raw,values:transformed.values,baseline:transformed.baseline};
  });
@@ -140,7 +175,7 @@ function renderTable(rows){
 function renderAnalysis(){
  if(!model||!range.from||!range.to)return;syncButtons();
  const items=selectedItems(),status=$('#compare-status');
- if(!items.length){chart?.destroy();chart=null;$('#compare-chart').innerHTML='';$('#compare-table-head').innerHTML='';$('#compare-table-body').innerHTML='';status.hidden=false;status.textContent='Оберіть показники ліворуч.';return}
+ if(!items.length){chart?.destroy();chart=null;$('#compare-chart').innerHTML='';$('#compare-table-head').innerHTML='';$('#compare-table-body').innerHTML='';status.hidden=false;status.textContent='Оберіть показники у блоці «Показники».';return}
  const validation=D.validateDateRange(range.from,range.to);if(!validation.valid){status.hidden=false;status.textContent=validation.reason;return}
  status.hidden=true;const rows=analysisRows();
  chart?.destroy();chart=null;$('#compare-chart').innerHTML='';
@@ -148,11 +183,13 @@ function renderAnalysis(){
  renderTable(rows);
  const notes=[];
  if(valueMode==='normalized')notes.push('Нормалізація: перше доступне ненульове значення кожної серії = 100.');else notes.push('Абсолютний режим використовує спільну шкалу; для показників різного порядку величини зручніше нормалізоване порівняння.');
- if(unit)notes.push(`Фільтр підрозділу «${unit}» застосовано лише до показників, де джерело має таку деталізацію.`);
+ if(selectedUnits.size===1)notes.push(`Підрозділ: ${unitScopeLabel()}. Для батьківського вузла використовується тільки його власний рядок джерела.`);
+ if(selectedUnits.size>1)notes.push(`Підрозділи: ${unitScopeLabel()}. Серії сумуються тільки за явно вибраними вузлами; parent і його нащадки одночасно не враховуються.`);
+ if(selectedUnits.size&&items.some(item=>!item.supportsUnit))notes.push('Показники без підроздільної деталізації залишаються загальними.');
  if(rows.unavailable)notes.push(`${rows.unavailable} сер. без ненульової бази не нормалізовано.`);
- if(rows.missing)notes.push('Пропуски залишаються «—» і не прирівнюються до нуля.');
+ if(rows.missing)notes.push('Пропуски залишаються «—» і не прирівнюються до нуля; при виборі кількох підрозділів неповний день не підсумовується частково.');
  $('#compare-data-note').textContent=notes.join(' ');
- $('#compare-range-note').textContent=`${fullDate(range.from)} — ${fullDate(range.to)} · ${items.length} показник${items.length===1?'':items.length<5?'и':'ів'}`;
+ $('#compare-range-note').textContent=`${fullDate(range.from)} — ${fullDate(range.to)} · ${items.length} показник${items.length===1?'':items.length<5?'и':'ів'} · ${unitScopeLabel()}`;
 }
 
 function applyRange(nextFrom,nextTo){
@@ -182,7 +219,6 @@ dialog.querySelectorAll('[data-compare-days]').forEach(node=>node.addEventListen
  if(!model)return;const days=Number(node.dataset.compareDays);applyRange(clamp(D.shift(range.to,-days+1),bounds.from,bounds.to),range.to);
 }));
 $('#compare-dashboard-period').addEventListener('click',()=>{const from=$('#from')?.value,to=$('#to')?.value;if(from&&to)applyRange(from,to)});
-$('#compare-unit').addEventListener('change',event=>{unit=event.target.value;renderAnalysis()});
 dialog.querySelectorAll('[data-compare-chart]').forEach(node=>node.addEventListener('click',()=>{chartType=node.dataset.compareChart;renderAnalysis()}));
 dialog.querySelectorAll('[data-compare-mode]').forEach(node=>node.addEventListener('click',()=>{valueMode=node.dataset.compareMode;renderAnalysis()}));
 
