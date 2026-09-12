@@ -1,52 +1,48 @@
 # Поточний стан
 
-Оновлено: **2026-09-12**. Етап 3 — performance & maintainability — перевірено користувачем і злитий у `main` squash-комітом `142a43f`. Етап 4 — change-scoped quality automation — виконується у гілці `test/change-scoped-quality`, draft PR #4.
+Оновлено: **2026-09-12**. Етапи 1–4 злиті у `main`. Етап 5 — **unit hierarchy & archive** — виконується у гілці `feature/unit-hierarchy-archive`, draft PR #5.
 
-## Реалізовано в `main`
+## Стабільний `main`
 
-- Статичний локальний dashboard без backend/persistence; runtime не потребує npm/build-system.
-- `contour-config.js` централізує runtime/workbook config, source kinds і date policy.
-- `validateWorkbook()` виконується до `parse()`; critical errors блокують імпорт, warnings відображаються користувачу.
+- Локальний статичний dashboard без backend; runtime не потребує npm/build-system.
+- Excel validation виконується до parse; critical errors блокують імпорт, warnings лишають книгу доступною.
 - `source.kind` відділений від filename.
-- `aggregate()` для parsed models використовує lazy indexes і bounded LRU cache; імпорти ізольовані.
-- `contour-view.js` і `contour-charts.js` винесені як pure helpers; state/DOM orchestration лишаються в `contour.js`.
-- Legacy sidebar і старий donut host прибрані.
-- Sticky-категорії при зміні категорії у compact-режимі залишаються pinned/compact; переміщується лише контент під ними.
-- Partial distribution із `null` пояснюється явно; null не прирівнюється до нуля.
+- `aggregate()` використовує lazy indexes + bounded LRU cache без зміни числової семантики.
+- `contour-view.js`, `contour-charts.js`, `contour-navigation.js` винесені окремо від основного orchestration.
+- Legacy sidebar/donut DOM прибрані.
+- Sticky-категорії зберігають compact/pinned стан при зміні категорії; переміщується контент під ними.
+- Change-scoped GitHub Actions уже є merge gate: syntax/regression/browser checks запускаються лише за релевантним diff.
+- Playwright scopes: `core`, `sticky`, `charts`, `bps`; resource revision перевіряється окремо.
 
-## Етап 4 — робоча гілка
+## Етап 5 — робоча гілка
 
-- `.github/workflows/quality.yml` запускається на PR і push у `main`.
-- `scripts/quality-scope.cjs` визначає перевірки за changed files + patch content.
-- Syntax check — лише змінені first-party JS.
-- Adapter regression — лише schema/data/aggregate/workbook changes.
-- Playwright browser tests поділені на `core`, `sticky`, `charts`, `bps`.
-- BpS-test запускається лише при БпС/FPV/drone-related diff або зміні test infrastructure.
-- Docs-only changes не запускають runtime/browser tests.
-- `scripts/resource-version.cjs` перевіряє єдину first-party `?v=` revision і дозволяє підняти її однією командою.
-- `package.json` і Playwright є dev/test tooling; production runtime не змінений і не потребує npm.
-
-## Статус CI
-
-- Перший Stage 4 run: scope/syntax/regression пройшли; browser suite знайшов передчасне вимірювання smooth-scroll у самому sticky-test.
-- Sticky-test виправлено без зміни runtime.
-- Наступний прогін: core, charts, BpS і sticky browser tests пройшли; syntax/regression також пройшли.
-- Подальші коміти Stage 4 повторно перевіряються тим самим change-scoped workflow.
+- Додано `js/contour-units.js` і `css/contour-units.css`.
+- Каталог підрозділів будується з повного ГОЧ після `ContourData.parse()`.
+- Ієрархія визначається за стабільним порядком рядків по датах: **угруповання → АК → підрозділ**.
+- Якщо той самий підрозділ у джерелі потрапляє під різних батьків, parent не вигадується; вузол позначається як неоднозначний.
+- Батьківські значення не обчислюються із дочірніх — у таблиці лишаються значення джерела, тому подвійного підсумовування немає.
+- Батьківський рядок розгортає/згортає дочірні; окрема дія відкриває його деталі.
+- Статуси: `active`, `hidden`, `archived`.
+- Статуси зберігаються тільки в `localStorage` як UI-настройка; Excel і нормалізовані записи не змінюються.
+- Архівовані підрозділи приховані за замовчуванням, але можуть бути показані через «Архів» і відкривати історичні деталі за період, у якому є записи.
+- First-party resource revision у Stage 5: **31**.
+- Додано окремий change-scoped browser test `tests/browser/units.spec.cjs`.
 
 ## Git/GitHub
 
 - Канонічний репозиторій: `u3IOm4uk/DashCodex`.
 - Базова гілка: `main`.
-- Поточна робоча гілка: `test/change-scoped-quality`.
-- Draft PR: **#4 — Stage 4: change-scoped quality automation**.
+- Поточна гілка: `feature/unit-hierarchy-archive`.
+- Draft PR: **#5 — Stage 5: unit hierarchy and archive**.
+- Merge у `main` — лише після green CI та перевірки сценарію ієрархії/архіву.
 
-## Відомі відкриті задачі
+## Відкритий технічний борг
 
-- T05: глибше CSS-cascade cleanup після стабілізації automated browser coverage.
-- T08: фактичне профілювання великої книги та фізичних/альтернативних браузерів.
+- T05: глибше CSS-cascade cleanup.
+- T08: profiling великої книги, Safari/Firefox і фізичних пристроїв.
 - Acceptance policy книги лише з персоналом/БК не розширена.
 - Одиниця територій не підтверджена; формули Excel не перераховуються.
 
 ## Поточний фокус
 
-Довести PR #4 до фінального green CI і після перевірки використовувати change-scoped quality gate як стандартний merge-процес.
+Завершити Stage 5: green change-scoped CI, browser review і синхронізація контрактів ієрархії/архіву. Не розширювати scope на нові аналітичні фічі до стабілізації цієї моделі.

@@ -24,6 +24,7 @@ jobs:
       browser_sticky: ${{ steps.scope.outputs.browser_sticky }}
       browser_bps: ${{ steps.scope.outputs.browser_bps }}
       browser_charts: ${{ steps.scope.outputs.browser_charts }}
+      browser_units: ${{ steps.scope.outputs.browser_units }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -89,7 +90,7 @@ jobs:
 
   browser:
     needs: scope
-    if: needs.scope.outputs.browser_core == 'true' || needs.scope.outputs.browser_sticky == 'true' || needs.scope.outputs.browser_bps == 'true' || needs.scope.outputs.browser_charts == 'true'
+    if: needs.scope.outputs.browser_core == 'true' || needs.scope.outputs.browser_sticky == 'true' || needs.scope.outputs.browser_bps == 'true' || needs.scope.outputs.browser_charts == 'true' || needs.scope.outputs.browser_units == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -108,5 +109,6 @@ jobs:
           [ "${{ needs.scope.outputs.browser_sticky }}" = "true" ] && files+=(tests/browser/sticky.spec.cjs)
           [ "${{ needs.scope.outputs.browser_bps }}" = "true" ] && files+=(tests/browser/bps.spec.cjs)
           [ "${{ needs.scope.outputs.browser_charts }}" = "true" ] && files+=(tests/browser/charts.spec.cjs)
+          [ "${{ needs.scope.outputs.browser_units }}" = "true" ] && files+=(tests/browser/units.spec.cjs)
           printf 'Selected browser tests: %s\n' "${files[*]}"
           npx playwright test "${files[@]}"
