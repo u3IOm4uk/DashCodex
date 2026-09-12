@@ -61,6 +61,8 @@ test('cross-category comparison builds a shared analytical view with hierarchica
  const checked=page.locator('#compare-catalog [data-compare-metric]:checked');expect(await checked.count()).toBeGreaterThanOrEqual(2);
  const [metricsBox,workspaceBox,unitsBox]=await Promise.all([page.locator('.compare-metrics-panel').boundingBox(),page.locator('.compare-workspace').boundingBox(),page.locator('.compare-units-panel').boundingBox()]);
  expect(metricsBox.x+metricsBox.width).toBeLessThanOrEqual(workspaceBox.x+1);expect(unitsBox.x).toBeGreaterThanOrEqual(workspaceBox.x+workspaceBox.width-1);
+ const graphControls=page.locator('.compare-chart-controls');await expect(graphControls).toHaveClass(/segmented/);expect(await graphControls.locator('button').allTextContents()).toEqual(['','']);
+ const valueControls=page.locator('.compare-value-controls');await expect(valueControls).toHaveClass(/segmented/);
  await expect(page.locator('#compare-units-all')).toHaveAttribute('aria-pressed','true');
  const parentToggle=page.locator('#compare-unit-tree [data-unit-toggle]').first(),parentRow=parentToggle.locator('xpath=..'),parentNode=parentRow.locator('xpath=..'),parentInput=parentRow.locator('[data-compare-unit]');
  await parentInput.check();await expect(parentInput).toBeChecked();await expect(parentToggle).toHaveAttribute('aria-expanded','true');
@@ -86,7 +88,7 @@ test('cross-category comparison builds a shared analytical view with hierarchica
  const dashboardFrom=await page.locator('#from').inputValue(),dashboardTo=await page.locator('#to').inputValue();await page.locator('#compare-dashboard-period').click();await expect(page.locator('#compare-from')).toHaveValue(dashboardFrom);await expect(page.locator('#compare-to')).toHaveValue(dashboardTo);
 });
 
-test('comparison action keeps mobile navigation and opens filters only by buttons',async({page})=>{
+test('comparison action keeps mobile navigation and opens filters as dropdown overlays',async({page})=>{
  await page.goto('/');await expect(page.locator('#trend-chart')).toBeVisible({timeout:15000});
  await expect(page.locator('.section-nav-row > #compare-open')).toBeVisible();
  await expect(page.locator('.analysis-tools #compare-open')).toHaveCount(0);
@@ -96,10 +98,14 @@ test('comparison action keeps mobile navigation and opens filters only by button
  await page.locator('#mobile-compare').click();
  const dialog=page.locator('#compare-dialog');await expect(dialog).toBeVisible();await expect(nav).toBeVisible();expect(await dialog.evaluate(el=>el.matches(':modal'))).toBe(false);
  const [dialogBox,navBox]=await Promise.all([dialog.boundingBox(),nav.boundingBox()]);expect(dialogBox.y+dialogBox.height).toBeLessThanOrEqual(navBox.y+1);
- await expect(page.locator('.compare-mobile-pickers')).toBeVisible();await expect(page.locator('.compare-metrics-panel')).toBeHidden();await expect(page.locator('.compare-units-panel')).toBeHidden();
- await page.locator('label[for="compare-mobile-metrics-toggle"]').click();await expect(page.locator('.compare-metrics-panel')).toBeVisible();await expect(page.locator('#compare-catalog .compare-category[open]')).toHaveCount(0);
- const metricsBox=await page.locator('.compare-metrics-panel').boundingBox();expect(metricsBox.x).toBeGreaterThanOrEqual(0);expect(metricsBox.x+metricsBox.width).toBeLessThanOrEqual(391);
- await page.locator('label[for="compare-mobile-metrics-toggle"]').click();await expect(page.locator('.compare-metrics-panel')).toBeHidden();
- await page.locator('label[for="compare-mobile-units-toggle"]').click();await expect(page.locator('.compare-units-panel')).toBeVisible();const unitsBox=await page.locator('.compare-units-panel').boundingBox();expect(unitsBox.x+unitsBox.width).toBeLessThanOrEqual(391);
+ const metrics=page.locator('.compare-metrics-panel'),units=page.locator('.compare-units-panel'),workspace=page.locator('.compare-workspace');
+ await expect(page.locator('.compare-mobile-pickers')).toBeVisible();await expect(metrics).toBeHidden();await expect(units).toBeHidden();
+ const workspaceY=await workspace.evaluate(el=>el.getBoundingClientRect().y);
+ await page.locator('label[for="compare-mobile-metrics-toggle"]').click();await expect(metrics).toBeVisible();await expect(page.locator('#compare-catalog .compare-category[open]')).toHaveCount(0);
+ expect(await metrics.evaluate(el=>getComputedStyle(el).position)).toBe('fixed');expect(Math.abs((await workspace.evaluate(el=>el.getBoundingClientRect().y))-workspaceY)).toBeLessThanOrEqual(1);
+ const metricsBox=await metrics.boundingBox();expect(metricsBox.x).toBeGreaterThanOrEqual(0);expect(metricsBox.x+metricsBox.width).toBeLessThanOrEqual(391);
+ await page.locator('label[for="compare-mobile-units-toggle"]').click();await expect(metrics).toBeHidden();await expect(units).toBeVisible();expect(await units.evaluate(el=>getComputedStyle(el).position)).toBe('fixed');
+ const unitsBox=await units.boundingBox();expect(unitsBox.x+unitsBox.width).toBeLessThanOrEqual(391);expect(Math.abs((await workspace.evaluate(el=>el.getBoundingClientRect().y))-workspaceY)).toBeLessThanOrEqual(1);
+ await page.locator('label[for="compare-mobile-units-toggle"]').click();await expect(units).toBeHidden();
  await page.locator('#mobile-overview').click();await expect(dialog).toBeHidden();await expect(nav).toBeVisible();
 });
