@@ -109,7 +109,7 @@ function renderManager(){
   }).join('');
   list.querySelectorAll('[data-unit-status]').forEach(select=>select.onchange=()=>setStatus(select.dataset.unitStatus,select.value));
 }
-const escapeHtml=value=>String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[ch]));
+const escapeHtml=value=>String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 const escapeAttr=escapeHtml;
 
 function decorateRow(row,node){
