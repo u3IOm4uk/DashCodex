@@ -31,9 +31,10 @@ npx playwright install chromium
 | sticky/navigation-related diff | `tests/browser/sticky.spec.cjs` |
 | chart-related diff | `tests/browser/charts.spec.cjs` |
 | БпС/FPV/drone-related diff | `tests/browser/bps.spec.cjs` |
+| hierarchy/archive-related diff | `tests/browser/units.spec.cjs` |
 | CI/test infrastructure | повний quality suite |
 
-Отже, БпС **не перевіряється при кожному PR** — лише коли diff реально зачіпає БпС/FPV/drone-код/стилі або саму test infrastructure.
+БпС не перевіряється при кожному PR; так само hierarchy/archive test запускається лише для змін, що можуть вплинути на цю модель або її UI.
 
 ## GitHub Actions
 
@@ -47,7 +48,7 @@ Workflow: `.github/workflows/quality.yml`.
 4. `regression` — тільки data/schema/aggregate scope;
 5. `browser` — тільки релевантні Playwright specs.
 
-Push у `main` і кожен pull request отримують автоматичний pass/fail лише за релевантними перевірками.
+Push у `main` і кожен pull request отримують автоматичний pass/fail лише за релевантними перевірками. Старі runs того самого PR скасовуються через `concurrency`.
 
 ## Resource revision
 
@@ -77,24 +78,35 @@ node scripts/resource-version.cjs 31
 
 ### Core
 
-Перевіряє базове завантаження dashboard, картки, зміну категорії, основний графік, структуру та таблицю.
+Базове завантаження dashboard, картки, зміна категорії, основний графік, структура та таблиця.
 
 ### Sticky
 
-Перевіряє, що при зміні категорії у `cards-away` стані sticky-картки залишаються стисненими, а вгору підтягується контент під ними, а не вся сторінка.
+При зміні категорії у `cards-away` стані sticky-картки лишаються стисненими; переміщується контент під ними.
 
 ### Charts
 
-Перевіряє area/bar та territory balance.
+Area/bar та territory balance.
 
 ### БпС
 
-Перевіряє сім карток БпС, вибір FPV та базову працездатність відповідного графіка. Цей spec запускається **тільки за BpS scope**.
+Сім карток БпС, FPV і базова працездатність відповідного графіка. Запуск лише за BpS scope.
+
+### Units
+
+`tests/browser/units.spec.cjs` перевіряє:
+
+- стабільне визначення `угруповання → АК → підрозділ` на синтетичних даних;
+- неоднозначний parent лишається невизначеним, а не вгадується;
+- клік батьківського рядка розгортає дітей;
+- архівований рядок приховується за замовчуванням;
+- після ввімкнення «Архів» рядок знову доступний;
+- історичні деталі архівованого підрозділу відкриваються штатним detail-handler.
 
 ## Ручні перевірки
 
-Автоматизація не замінює ручну FULL-перевірку, коли змінюється глобальний layout/responsive, складна анімація або UX-концепція. Для таких змін перевіряти релевантні viewport, а не механічно весь проєкт.
+Автоматизація не замінює ручну FULL-перевірку для глобального layout/responsive, складної анімації або нової UX-концепції. Для Stage 5 достатньо перевірити таблицю ГОЧ на desktop і mobile: expand/collapse, деталі батька, manager status, archive toggle і повернення статусу в `active`.
 
 ## Принцип
 
-Мінімальний достатній тестовий обсяг = **змінений код + його безпосередні залежності + ризик регресії**. Не запускати повний browser-suite або БпС-suite без причини.
+Мінімальний достатній тестовий обсяг = **змінений код + його безпосередні залежності + ризик регресії**. Не запускати повний browser-suite без причини.
