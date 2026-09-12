@@ -38,6 +38,8 @@ test('hierarchy inference keeps stable parents and rejects ambiguous ones',async
 
 test('expand control is aligned before the name and the name opens details',async({page})=>{
  await openDashboard(page);
+ const snapshot=await page.evaluate(()=>ContourUnits.catalog.nodes.map(({name,parent,level,ambiguous,children})=>({name,parent,level,ambiguous,children})));
+ console.log('UNIT_CATALOG:'+JSON.stringify(snapshot));
  const parent=page.locator('#table-body tr.unit-parent').first();
  await expect(parent).toBeVisible();
  const parentName=await parent.getAttribute('data-unit-name');
