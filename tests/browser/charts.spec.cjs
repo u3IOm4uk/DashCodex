@@ -65,13 +65,19 @@ test('cross-category comparison builds a shared analytical view with hierarchica
  const parentToggle=page.locator('#compare-unit-tree [data-unit-toggle]').first(),parentRow=parentToggle.locator('xpath=..'),parentNode=parentRow.locator('xpath=..'),parentInput=parentRow.locator('[data-compare-unit]');
  await parentInput.check();await expect(parentInput).toBeChecked();await expect(parentToggle).toHaveAttribute('aria-expanded','true');
  const children=parentNode.locator('.compare-unit-children [data-compare-unit]');expect(await children.count()).toBeGreaterThanOrEqual(2);await expect(children.first()).toBeVisible();
+ const childNames=await children.evaluateAll(nodes=>nodes.slice(0,2).map(input=>input.parentElement.textContent.trim()));
  await children.first().check();await expect(parentInput).not.toBeChecked();await expect(children.first()).toBeChecked();
  await children.nth(1).check();await expect(page.locator('#compare-unit-count')).toContainText('2');await expect(page.locator('#compare-data-note')).toContainText('Серії сумуються');
  await expect(page.locator('#compare-data-note')).toContainText('Нормалізація');
+ await expect(page.locator('#compare-table-head')).toContainText('Підрозділ');await expect(page.locator('#compare-table-body')).toContainText(childNames[0]);await expect(page.locator('#compare-table-body')).toContainText(childNames[1]);
+ await expect(page.locator('#compare-table-foot')).toContainText('Абсолютні значення джерела');
+ const tableBeforeMode=await page.locator('#compare-table-body').textContent();
  await page.locator('[data-compare-mode="absolute"]').click();await expect(page.locator('[data-compare-mode="absolute"]')).toHaveAttribute('aria-pressed','true');
+ expect(await page.locator('#compare-table-body').textContent()).toEqual(tableBeforeMode);
  await page.locator('[data-compare-chart="bar"]').click();await expect(page.locator('[data-compare-chart="bar"]')).toHaveAttribute('aria-pressed','true');
  await expect(page.locator('#compare-table-body tr').first()).toBeVisible();
  await expect(page.locator('.compare-table-panel')).toHaveClass(/panel/);await expect(page.locator('.compare-table-panel')).toHaveClass(/details-panel/);await expect(page.locator('.compare-table-wrap')).toHaveClass(/table-wrap/);
+ const detailWrapStyle=await page.locator('#analysis-grid .details-panel .table-wrap').evaluate(el=>{const s=getComputedStyle(el);return {maxHeight:s.maxHeight,overflowX:s.overflowX,overflowY:s.overflowY}}),compareWrapStyle=await page.locator('.compare-table-wrap').evaluate(el=>{const s=getComputedStyle(el);return {maxHeight:s.maxHeight,overflowX:s.overflowX,overflowY:s.overflowY}});expect(compareWrapStyle).toEqual(detailWrapStyle);
  const dashboardFrom=await page.locator('#from').inputValue(),dashboardTo=await page.locator('#to').inputValue();await page.locator('#compare-dashboard-period').click();await expect(page.locator('#compare-from')).toHaveValue(dashboardFrom);await expect(page.locator('#compare-to')).toHaveValue(dashboardTo);
 });
 
