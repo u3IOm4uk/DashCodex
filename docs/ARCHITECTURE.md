@@ -1,6 +1,6 @@
 # Архітектура
 
-Актуалізовано: 2026-09-12. Проєкт зберігається у приватному GitHub-репозиторії. Активний КОНТУР — статичний застосунок без build-system і backend; npm використовується лише для test tooling.
+Актуалізовано: 2026-09-13. Проєкт зберігається у приватному GitHub-репозиторії. Активний КОНТУР — статичний застосунок без build-system і backend; npm використовується лише для test tooling.
 
 ## Активний runtime
 
@@ -14,10 +14,12 @@
 | `js/contour-charts.js` | Pure ApexCharts option builders і mini-bar SVG |
 | `js/contour-navigation.js` | Targeted navigation adapter для category/sticky scroll behavior |
 | `js/contour.js` | Runtime state, import/export, DOM orchestration, dialogs, chart lifecycle, основний render |
+| `js/contour-compare.js` | Незалежний UI/runtime конструктора міжкатегорійного порівняння поверх чинних `ContourData.parse()` / `aggregate()` |
 | `css/contour.css` | Базова тема, компоненти, адаптивність |
 | `css/contour-detail.css` | Парні показники й типи БпС |
 | `css/contour-refinement.css` | Чинні уточнення sticky/navigation/щільності |
 | `css/contour-units.css` | Ієрархічна таблиця, archive/status manager |
+| `css/contour-compare.css` | Двоколонковий desktop та full-screen mobile layout конструктора порівняння |
 | `js/xlsx.full.min.js`, `js/apexcharts.js` | Локальні SheetJS та ApexCharts |
 | `.audit/` | Data/regression checks і workbook profiling |
 | `tests/browser/` | Change-scoped Playwright scenarios |
@@ -26,6 +28,8 @@
 Основний data flow: **Excel → SheetJS.read → validateWorkbook → parse/normalize → lazy indexes/cache → sections/categories → aggregate → UI**.
 
 Unit presentation-гілка після parse: **parsed GOCh records + `ContourConfig.UNIT_HIERARCHY` → `ContourUnits.buildCatalog` → hierarchy/status view → існуюча detail table**. Вона не змінює normalized records і не входить у aggregate math.
+
+Comparison flow: **та сама локальна Excel-книга → `ContourData.parse()` → `ContourData.sections()` → каталог доступних серій → окремі `aggregate()` для вибраних показників → presentation-only normalized/absolute transform → ApexCharts + таблиця**. Конструктор не вводить власних source-полів, parent-сум або альтернативної aggregate math.
 
 ## Конфігурація та Excel-контракт
 
@@ -79,6 +83,8 @@ Runtime source metadata: `{kind,name}`. Filename не визначає bundled/u
 
 Data workbook після reload завантажується заново; unit visibility/archive preference є локальною persistence, а hierarchy source є статичною конфігурацією репозиторію.
 
+`contour-compare.js` не має доступу до closure основного `contour.js`, тому першу версію comparison runtime будує ліниво з тієї самої bundled книги або повторно парсить файл після File API import. Обидва runtime використовують один `ContourData` контракт і не розходяться у формулах; можливий read-only runtime bridge розглядається лише як майбутня оптимізація після profiling.
+
 ## Дати
 
 `APP_CONFIG.datePolicy`:
@@ -96,6 +102,8 @@ Preset «Увесь період» може бути ширшим за manual UX
 
 `contour-units.js` має власний presentation state (`catalog`, `expanded`, status overrides, showArchived) і не володіє analytics state. Він спостерігає rerender `#table-body` через `MutationObserver` і повторно накладає hierarchy state на нові rows.
 
+`contour-compare.js` має окремий локальний state: parsed model/source metadata, metric catalog, selected series, comparison period, unit filter, chart/value modes та chart instance. Цей state не змінює основні `from/to`, section/category або normalized records.
+
 `contour-view.js`/`contour-charts.js` pure; `contour-navigation.js` не володіє data model. `generation` у main render відсікає stale async chart completion.
 
 ## Навігація і sticky
@@ -111,6 +119,8 @@ Preset «Увесь період» може бути ширшим за manual UX
 Мініграфіки мають `.mini-hover` із датами та значеннями; делегований pointer-handler показує спільний tooltip поза overflow-контейнерами. Мініграфіки не перехоплюють колесо.
 
 `ContourCharts.periodRange()` визначає календарне вікно в межах дат джерела. `mountPlotPeriod()` додає пресети й wheel-handler до основного/модального chart-host; події колеса об’єднуються перед оновленням графіка. `mainPlotWindow` та локальне вікно деталей не змінюють облікові `from/to`. Нові точки отримуються через чинний `aggregate()`; кеш/формули не змінені. AbortController і cleanup прибирають wheel-handler та таймер при rerender/закритті деталей.
+
+Comparison chart має власний ApexCharts lifecycle. Режим `normalized` виконує тільки presentation-transform: перше доступне ненульове значення серії = 100; `absolute` використовує вихідні значення. `null` не перетворюється на 0. Unit filter передається в чинний `aggregate()` лише для джерел, де така деталізація існує.
 
 ## Імпорт, експорт і запуск
 
