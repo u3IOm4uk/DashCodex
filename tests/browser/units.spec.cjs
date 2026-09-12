@@ -100,14 +100,24 @@ test('configured hierarchy renders below parent with branch, detail breakdown an
  await expect(page.locator('#detail-dialog')).toBeVisible();
  await expect(page.locator('#detail-name')).toHaveText(parentName);
  await expect(page.locator('#detail-dialog > .sheet-heading')).toHaveCSS('margin-bottom','10px');
+ const baseSheetRule=await page.evaluate(async()=>{
+   const css=await fetch('css/contour.css').then(r=>r.text());
+   const match=css.match(/\.sheet-heading\{[^}]+\}/)?.[0]||'';
+   return match;
+ });
+ expect(baseSheetRule).toContain('margin-bottom:10px');
+ expect(baseSheetRule).not.toContain('margin-bottom:25px');
  const trendLayout=await page.locator('#detail-content .detail-trend').evaluate(trend=>{
    const title=trend.querySelector('h3')?.getBoundingClientRect(),period=trend.querySelector('p')?.getBoundingClientRect(),controls=trend.querySelector('.detail-chart-controls')?.getBoundingClientRect();
-   return title&&period&&controls?{textTop:title.top,textBottom:period.bottom,textRight:Math.max(title.right,period.right),controlsTop:controls.top,controlsBottom:controls.bottom,controlsLeft:controls.left}:null;
+   if(!title||!period||!controls)return null;
+   const centerY=rect=>rect.top+rect.height/2;
+   return {titleRight:title.right,periodLeft:period.left,periodRight:period.right,controlsLeft:controls.left,titleY:centerY(title),periodY:centerY(period),controlsY:centerY(controls)};
  });
  expect(trendLayout).not.toBeNull();
- expect(trendLayout.controlsTop).toBeLessThan(trendLayout.textBottom);
- expect(trendLayout.controlsBottom).toBeGreaterThan(trendLayout.textTop);
- expect(trendLayout.controlsLeft).toBeGreaterThan(trendLayout.textRight);
+ expect(Math.abs(trendLayout.titleY-trendLayout.periodY)).toBeLessThan(3);
+ expect(Math.abs(trendLayout.periodY-trendLayout.controlsY)).toBeLessThan(3);
+ expect(trendLayout.periodLeft).toBeGreaterThan(trendLayout.titleRight);
+ expect(trendLayout.controlsLeft).toBeGreaterThan(trendLayout.periodRight);
  const detailTable=page.locator('#detail-content .detail-hierarchy-table');
  await expect(detailTable).toBeVisible();
  await expect(detailTable.locator('thead th').nth(1)).toHaveText('Підрозділ');
