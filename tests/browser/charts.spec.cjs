@@ -52,12 +52,19 @@ test('wheel and presets resize only the chart, retain modes, and reset with filt
  const table=await page.locator('#detail-content table').textContent();await page.locator('#detail-dialog [data-plot-days="7"]').click();await expect(detail).toHaveAttribute('data-plot-from','2026-09-01');await detail.hover();await page.mouse.wheel(0,120);await expect(detail).not.toHaveAttribute('data-plot-from','2026-09-01');expect(await page.locator('#detail-content table').textContent()).toEqual(table);
 });
 
-test('cross-category comparison builds a shared analytical view',async({page})=>{
+test('cross-category comparison builds a shared analytical view with hierarchical unit scope',async({page})=>{
  await page.goto('/');await expect(page.locator('#trend-chart')).toBeVisible({timeout:15000});
  await page.locator('#compare-open').click();await expect(page.locator('#compare-dialog')).toBeVisible();
- await expect(page.locator('#compare-catalog [data-compare-metric]').first()).toBeVisible({timeout:15000});
+ const categories=page.locator('#compare-catalog .compare-category');expect(await categories.count()).toBeGreaterThan(0);expect(await categories.evaluateAll(nodes=>nodes.every(node=>!node.open))).toBe(true);
+ await categories.first().locator('summary').click();await expect(categories.first().locator('[data-compare-metric]').first()).toBeVisible({timeout:15000});
  await expect(page.locator('#compare-chart .apexcharts-canvas')).toBeVisible({timeout:15000});
  const checked=page.locator('#compare-catalog [data-compare-metric]:checked');expect(await checked.count()).toBeGreaterThanOrEqual(2);
+ await expect(page.locator('.compare-units-panel')).toBeVisible();await expect(page.locator('#compare-units-all')).toHaveAttribute('aria-pressed','true');
+ const parentToggle=page.locator('#compare-unit-tree [data-unit-toggle]').first(),parentRow=parentToggle.locator('xpath=..'),parentNode=parentRow.locator('xpath=..'),parentInput=parentRow.locator('[data-compare-unit]');
+ await parentInput.check();await expect(parentInput).toBeChecked();await expect(parentToggle).toHaveAttribute('aria-expanded','true');
+ const children=parentNode.locator('.compare-unit-children [data-compare-unit]');expect(await children.count()).toBeGreaterThanOrEqual(2);await expect(children.first()).toBeVisible();
+ await children.first().check();await expect(parentInput).not.toBeChecked();await expect(children.first()).toBeChecked();
+ await children.nth(1).check();await expect(page.locator('#compare-unit-count')).toContainText('2');await expect(page.locator('#compare-data-note')).toContainText('Серії сумуються');
  await expect(page.locator('#compare-data-note')).toContainText('Нормалізація');
  await page.locator('[data-compare-mode="absolute"]').click();await expect(page.locator('[data-compare-mode="absolute"]')).toHaveAttribute('aria-pressed','true');
  await page.locator('[data-compare-chart="bar"]').click();await expect(page.locator('[data-compare-chart="bar"]')).toHaveAttribute('aria-pressed','true');
@@ -81,6 +88,8 @@ test('comparison action moves to section navigation and keeps mobile navigation 
  const dialog=page.locator('#compare-dialog');await expect(dialog).toBeVisible();
  await expect(nav).toBeVisible();
  expect(await dialog.evaluate(el=>el.matches(':modal'))).toBe(false);
- const [dialogBox,navBox]=await Promise.all([dialog.boundingBox(),nav.boundingBox()]);expect(dialogBox.y+dialogBox.height).toBeLessThanOrEqual(navBox.y+1);
+ const [dialogBox,navBox,metricsBox,unitsBox]=await Promise.all([dialog.boundingBox(),nav.boundingBox(),page.locator('.compare-metrics-panel').boundingBox(),page.locator('.compare-units-panel').boundingBox()]);
+ expect(dialogBox.y+dialogBox.height).toBeLessThanOrEqual(navBox.y+1);expect(metricsBox.x).toBeGreaterThanOrEqual(0);expect(metricsBox.x+metricsBox.width).toBeLessThanOrEqual(391);expect(unitsBox.x+unitsBox.width).toBeLessThanOrEqual(391);
+ await expect(page.locator('#compare-catalog .compare-category[open]')).toHaveCount(0);
  await page.locator('#mobile-overview').click();await expect(dialog).toBeHidden();await expect(nav).toBeVisible();
 });
