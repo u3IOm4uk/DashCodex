@@ -29,7 +29,7 @@ const UNIT_HIERARCHY=Object.freeze([
         unitNode('15 АК'),
         unitNode('18 АК')
     ]),
-    unitNode('УОС"',[
+    unitNode('УОС',[
         unitNode('14 АК'),
         unitNode('2 КНГУ "Хартія"'),
         unitNode('16 АК'),
