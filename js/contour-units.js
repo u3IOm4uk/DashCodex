@@ -66,7 +66,7 @@ function saveStatuses(storage,statuses){
 
 let data=null,catalog={nodes:[],index:Object.create(null),roots:[],unconfigured:[]},statuses={},showArchived=false;
 const expanded=new Set(),toggling=new Set();
-let refreshQueued=false,observer=null;
+let refreshQueued=false,observer=null,detailObserver=null;
 const storage=typeof localStorage!=='undefined'?localStorage:null;
 statuses=loadStatuses(storage);
 
@@ -109,7 +109,7 @@ function renderManager(){
   }).join('');
   list.querySelectorAll('[data-unit-status]').forEach(select=>select.onchange=()=>setStatus(select.dataset.unitStatus,select.value));
 }
-const escapeHtml=value=>String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+const escapeHtml=value=>String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[ch]));
 const escapeAttr=escapeHtml;
 
 function decorateRow(row,node){
@@ -172,9 +172,43 @@ function applyTableState(){
   for(const row of rows){const name=clean(row.querySelector('.row-name')?.textContent),node=nodeOf(name);if(!node)continue;const status=statusOf(node.name);row.classList.toggle('unit-status-archived',status===STATUS.ARCHIVED);row.classList.toggle('unit-status-hidden',status===STATUS.HIDDEN);row.hidden=!visibleNode(node);const expand=row.querySelector('.unit-expand');if(expand){const open=expanded.has(node.name);expand.setAttribute('aria-expanded',String(open));expand.textContent=open?'−':'+';expand.setAttribute('aria-label',`${open?'Згорнути':'Розгорнути'}: ${node.name}`)}}
   reindexVisibleRows(rows);return rows;
 }
+
+function detailCategory(){
+  const D=root.ContourData;if(!D||!data)return null;
+  const sectionId=document.querySelector('#inline-sections [data-section][aria-pressed="true"]')?.dataset.section;if(sectionId!=='ops')return null;
+  const section=D.sections(data).find(item=>item.id==='ops'),metricId=document.querySelector('#metrics [data-metric][aria-pressed="true"]')?.dataset.metric;
+  let category=section?.categories.find(item=>item.id===metricId);if(!section||!category)return null;
+  if(category.id==='drones'){
+    const types=[...C.WORKBOOK_SCHEMA.droneTypes],fpv=types.find(type=>type.id==='fpv'),ordered=[fpv,...types.filter(type=>type.id!=='fpv')].filter(Boolean);
+    category={...category,fields:ordered.map(type=>type.field),labels:ordered.map(type=>type.name),colors:ordered.map(type=>type.color)};
+  }
+  return {D,section,category};
+}
+function enhanceDetailTable(){
+  const dialog=document.querySelector('#detail-dialog');if(!dialog?.open)return;
+  const name=clean(document.querySelector('#detail-name')?.textContent),node=nodeOf(name),children=node?.children||[];if(!name||!children.length)return;
+  const context=detailCategory(),table=document.querySelector('#detail-content .table-wrap table'),from=document.querySelector('#from')?.value,to=document.querySelector('#to')?.value;if(!context||!table||!from||!to)return;
+  const key=[name,context.category.id,from,to].join('|');if(table.dataset.unitBreakdown===key)return;
+  const V=root.ContourView,fmt=V?.fmt||((value)=>value??'—'),fullDate=V?.fullDate||((value)=>value),entries=[name,...children];
+  const aggregates=new Map(entries.map(unit=>[unit,context.D.aggregate(data,context.section,context.category,from,to,unit)])),parent=aggregates.get(name),span=entries.length;
+  table.classList.add('detail-hierarchy-table');table.dataset.unitBreakdown=key;
+  table.querySelector('thead').innerHTML=`<tr><th scope="col">Дата</th><th scope="col">Підрозділ</th>${context.category.labels.map(label=>`<th scope="col">${escapeHtml(label)}</th>`).join('')}</tr>`;
+  table.querySelector('tbody').innerHTML=parent.days.map((day,index)=>{
+    const parentValues=parent.series.map(series=>series[index]);
+    const parentRow=`<tr class="detail-unit-parent" data-detail-date="${escapeAttr(day)}" data-detail-unit="${escapeAttr(name)}"><th scope="rowgroup" rowspan="${span}" class="detail-unit-date">${escapeHtml(fullDate(day))}</th><th scope="row" class="detail-unit-name"><strong>${escapeHtml(name)}</strong><small>загальний показник</small></th>${parentValues.map(value=>`<td>${escapeHtml(fmt(value))}</td>`).join('')}</tr>`;
+    const childRows=children.map(child=>{const aggregate=aggregates.get(child),values=aggregate.series.map(series=>series[index]);return `<tr class="detail-unit-child" data-detail-date="${escapeAttr(day)}" data-detail-unit="${escapeAttr(child)}" data-detail-parent="${escapeAttr(name)}"><th scope="row" class="detail-unit-name"><span aria-hidden="true">↳</span>${escapeHtml(child)}</th>${values.map(value=>`<td>${escapeHtml(fmt(value))}</td>`).join('')}</tr>`}).join('');
+    return parentRow+childRows;
+  }).join('');
+  const wrap=table.closest('.table-wrap');if(wrap)wrap.setAttribute('aria-label',`Поденні дані: ${name} та безпосередньо підпорядковані підрозділи`);
+  if(!table.parentElement.previousElementSibling?.classList.contains('detail-unit-note'))table.parentElement.insertAdjacentHTML('beforebegin','<p class="detail-unit-note">Нижче показані лише безпосередньо підпорядковані підрозділи. Загальний рядок — власний показник джерела і не є сумою дочірніх.</p>');
+}
+function observeDetail(){
+  const dialog=document.querySelector('#detail-dialog');if(!dialog||detailObserver)return;
+  detailObserver=new MutationObserver(()=>{if(dialog.open)queueMicrotask(enhanceDetailTable)});detailObserver.observe(dialog,{attributes:true,attributeFilter:['open']});
+}
 function requestRefresh(){if(typeof document==='undefined'||refreshQueued)return;refreshQueued=true;queueMicrotask(()=>{refreshQueued=false;applyTableState()})}
 function bootDom(){
-  if(typeof document==='undefined')return;ensureControls();ensureDialog();const body=document.querySelector('#table-body');if(!body)return;
+  if(typeof document==='undefined')return;ensureControls();ensureDialog();observeDetail();const body=document.querySelector('#table-body');if(!body)return;
   observer=new MutationObserver(()=>requestRefresh());observer.observe(body,{childList:true});requestRefresh();
 }
 function wrapParser(){
