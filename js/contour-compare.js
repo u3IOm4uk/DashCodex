@@ -8,7 +8,7 @@ const {esc,fmt,fullDate,shortDate}=V;
 const MAX_SERIES=6;
 const SERIES_COLORS=[D.colors.gold,D.colors.blue,D.colors.red,D.colors.green,D.colors.violet,D.colors.cyan];
 const DEFAULT_SELECTION=['ops:shells:0','ops:assault:1','ops:drones:fpv'];
-const button=$('#compare-open'),dialog=$('#compare-dialog');
+const button=$('#compare-open'),mobileButton=$('#mobile-compare'),dialog=$('#compare-dialog');
 if(!button||!dialog)return;
 
 let model=null,sourceName=C.APP_CONFIG.defaultWorkbook,sourceKind=C.APP_CONFIG.sourceKinds.BUNDLED;
@@ -18,6 +18,8 @@ let range={from:null,to:null},bounds={from:null,to:null},unit='';
 const dayStamp=day=>Date.parse(day+'T12:00:00Z');
 const clamp=(value,min,max)=>value<min?min:value>max?max:value;
 const daysBetween=(from,to)=>{const rows=[];for(let day=from;day<=to;day=D.shift(day,1))rows.push(day);return rows};
+const mobileComparison=()=>matchMedia('(max-width:650px)').matches;
+function syncMobileDialogOffset(){const nav=$('.mobile-nav'),height=nav?.getBoundingClientRect().height||64;dialog.style.setProperty('--compare-mobile-nav-height',height+'px')}
 
 function flattenUnits(nodes,out=[]){for(const node of nodes||[]){out.push(node.name);flattenUnits(node.children,out)}return out}
 const unitNames=[...new Set(flattenUnits(C.UNIT_HIERARCHY))];
@@ -158,13 +160,21 @@ function applyRange(nextFrom,nextTo){
  range={from:nextFrom,to:nextTo};$('#compare-from').value=range.from;$('#compare-to').value=range.to;renderAnalysis();
 }
 
-button.addEventListener('click',async()=>{
- dialog.showModal();
+async function openComparison(){
+ if(dialog.open)return;
+ if(mobileComparison()){
+  syncMobileDialogOffset();dialog.classList.add('compare-mobile-nav');dialog.show();
+ }else{
+  dialog.classList.remove('compare-mobile-nav');dialog.style.removeProperty('--compare-mobile-nav-height');dialog.showModal();
+ }
  try{await ensureModel();renderShell()}catch(error){console.error(error);setLoading('Не вдалося підключити дані для порівняння. Імпортуйте Excel або повторіть спробу.')}
-});
+}
+button.addEventListener('click',openComparison);mobileButton?.addEventListener('click',openComparison);
 dialog.querySelector('[data-compare-close]').addEventListener('click',()=>dialog.close());
-dialog.addEventListener('click',event=>{if(event.target===dialog){const box=dialog.getBoundingClientRect();if(event.clientX<box.left||event.clientX>box.right||event.clientY<box.top||event.clientY>box.bottom)dialog.close()}});
-dialog.addEventListener('close',()=>{chart?.destroy();chart=null});
+dialog.addEventListener('click',event=>{if(!dialog.classList.contains('compare-mobile-nav')&&event.target===dialog){const box=dialog.getBoundingClientRect();if(event.clientX<box.left||event.clientX>box.right||event.clientY<box.top||event.clientY>box.bottom)dialog.close()}});
+dialog.addEventListener('close',()=>{chart?.destroy();chart=null;dialog.classList.remove('compare-mobile-nav');dialog.style.removeProperty('--compare-mobile-nav-height')});
+['#mobile-overview','#mobile-menu'].forEach(selector=>$(selector)?.addEventListener('click',()=>{if(dialog.open&&dialog.classList.contains('compare-mobile-nav'))dialog.close()},true));
+addEventListener('resize',()=>{if(dialog.open&&dialog.classList.contains('compare-mobile-nav'))syncMobileDialogOffset()});
 
 $('#compare-from').addEventListener('change',()=>applyRange($('#compare-from').value,$('#compare-to').value));
 $('#compare-to').addEventListener('change',()=>applyRange($('#compare-from').value,$('#compare-to').value));
