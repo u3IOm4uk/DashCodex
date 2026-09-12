@@ -52,6 +52,11 @@ test('explicit hierarchy config defines parents and leaves unknown rows unconfig
 
 test('configured hierarchy renders below parent with branch and smooth expand collapse',async({page})=>{
  await openDashboard(page);
+ await page.evaluate(()=>{
+   window.__unitAnimationCalls=0;
+   const original=Element.prototype.animate;
+   Element.prototype.animate=function(...args){window.__unitAnimationCalls++;return original.apply(this,args)};
+ });
  const parent=page.locator('#table-body tr.unit-parent:visible').first();
  await expect(parent).toBeVisible();
  const parentName=await parent.getAttribute('data-unit-name');
@@ -64,6 +69,7 @@ test('configured hierarchy renders below parent with branch and smooth expand co
 
  await parent.locator('.unit-expand').click();
  await expect(parent.locator('.unit-expand')).toHaveAttribute('aria-expanded','true');
+ await expect.poll(()=>page.evaluate(()=>window.__unitAnimationCalls)).toBeGreaterThan(0);
  const parentIndex=await rowIndexBy(page,'unitName',parentName,true);
  const childIndex=await rowIndexBy(page,'unitParent',parentName,true);
  expect(childIndex).toBeGreaterThan(parentIndex);
@@ -76,11 +82,11 @@ test('configured hierarchy renders below parent with branch and smooth expand co
  await expect(child.locator('.unit-branch')).toBeVisible();
  expect(await child.locator('.unit-branch-segment').count()).toBe(childDepth);
  await expect(child.locator('.unit-branch-segment.current')).toHaveCount(1);
- await expect(child).toHaveClass(/unit-animating/);
  await expect(child).not.toHaveClass(/unit-animating/);
 
+ const beforeCollapse=await page.evaluate(()=>window.__unitAnimationCalls);
  await parent.locator('.unit-expand').click();
- await expect(child).toHaveClass(/unit-animating/);
+ await expect.poll(()=>page.evaluate(()=>window.__unitAnimationCalls)).toBeGreaterThan(beforeCollapse);
  await expect(child).toBeHidden();
  await expect(parent.locator('.unit-expand')).toHaveAttribute('aria-expanded','false');
 
