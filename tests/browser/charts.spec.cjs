@@ -65,15 +65,22 @@ test('cross-category comparison builds a shared analytical view',async({page})=>
  const dashboardFrom=await page.locator('#from').inputValue(),dashboardTo=await page.locator('#to').inputValue();await page.locator('#compare-dashboard-period').click();await expect(page.locator('#compare-from')).toHaveValue(dashboardFrom);await expect(page.locator('#compare-to')).toHaveValue(dashboardTo);
 });
 
-test('comparison action moves to section navigation and replaces mobile period/source actions',async({page})=>{
+test('comparison action moves to section navigation and keeps mobile navigation available',async({page})=>{
  await page.goto('/');await expect(page.locator('#trend-chart')).toBeVisible({timeout:15000});
  await expect(page.locator('.section-nav-row > #compare-open')).toBeVisible();
  await expect(page.locator('.analysis-tools #compare-open')).toHaveCount(0);
  await page.setViewportSize({width:390,height:844});
+ const nav=page.locator('.mobile-nav');
+ await expect(nav).toBeVisible();
  await expect(page.locator('#mobile-overview')).toBeVisible();
  await expect(page.locator('#mobile-menu')).toBeVisible();
  await expect(page.locator('#mobile-compare')).toBeVisible();
  await expect(page.locator('#mobile-dates')).toBeHidden();
  await expect(page.locator('#mobile-source')).toBeHidden();
- await page.locator('#mobile-compare').click();await expect(page.locator('#compare-dialog')).toBeVisible();
+ await page.locator('#mobile-compare').click();
+ const dialog=page.locator('#compare-dialog');await expect(dialog).toBeVisible();
+ await expect(nav).toBeVisible();
+ expect(await dialog.evaluate(el=>el.matches(':modal'))).toBe(false);
+ const [dialogBox,navBox]=await Promise.all([dialog.boundingBox(),nav.boundingBox()]);expect(dialogBox.y+dialogBox.height).toBeLessThanOrEqual(navBox.y+1);
+ await page.locator('#mobile-overview').click();await expect(dialog).toBeHidden();await expect(nav).toBeVisible();
 });
