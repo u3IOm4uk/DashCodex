@@ -51,3 +51,16 @@ test('wheel and presets resize only the chart, retain modes, and reset with filt
  await page.locator('#table-body .row-button').first().click();const detail=page.locator('#detail-trend-chart');await expect(detail).toBeVisible();
  const table=await page.locator('#detail-content table').textContent();await page.locator('#detail-dialog [data-plot-days="7"]').click();await expect(detail).toHaveAttribute('data-plot-from','2026-09-01');await detail.hover();await page.mouse.wheel(0,120);await expect(detail).not.toHaveAttribute('data-plot-from','2026-09-01');expect(await page.locator('#detail-content table').textContent()).toEqual(table);
 });
+
+test('cross-category comparison builds a shared analytical view',async({page})=>{
+ await page.goto('/');await expect(page.locator('#trend-chart')).toBeVisible({timeout:15000});
+ await page.locator('#compare-open').click();await expect(page.locator('#compare-dialog')).toBeVisible();
+ await expect(page.locator('#compare-catalog [data-compare-metric]').first()).toBeVisible({timeout:15000});
+ await expect(page.locator('#compare-chart .apexcharts-canvas')).toBeVisible({timeout:15000});
+ const checked=page.locator('#compare-catalog [data-compare-metric]:checked');expect(await checked.count()).toBeGreaterThanOrEqual(2);
+ await expect(page.locator('#compare-data-note')).toContainText('не прирівнюються до нуля');
+ await page.locator('[data-compare-mode="absolute"]').click();await expect(page.locator('[data-compare-mode="absolute"]')).toHaveAttribute('aria-pressed','true');
+ await page.locator('[data-compare-chart="bar"]').click();await expect(page.locator('[data-compare-chart="bar"]')).toHaveAttribute('aria-pressed','true');
+ await expect(page.locator('#compare-table-body tr').first()).toBeVisible();
+ const dashboardFrom=await page.locator('#from').inputValue(),dashboardTo=await page.locator('#to').inputValue();await page.locator('#compare-dashboard-period').click();await expect(page.locator('#compare-from')).toHaveValue(dashboardFrom);await expect(page.locator('#compare-to')).toHaveValue(dashboardTo);
+});
