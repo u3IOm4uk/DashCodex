@@ -22,40 +22,35 @@ const unitNode=(name,children=[])=>Object.freeze({name,children:Object.freeze(ch
 // Єдине джерело істини для ієрархії ГОЧ.
 // Вкладеність визначає рівень: 0 — угруповання, 1 — АК, 2+ — підрозділ.
 const UNIT_HIERARCHY=Object.freeze([
-  unitNode('УСБпС'),
-  unitNode('УВ (с) "Захід"'),
-  unitNode('12 АК',[
-    unitNode('15 АК'),
-    unitNode('18 АК')
-  ]),
-  unitNode('УВ "Курськ"',[
-    unitNode('14 АК',[
-      unitNode('2 КНГУ "Хартія"')
+    unitNode('УСБпС'),
+    unitNode('УВ (с) "Захід"'),
+    unitNode('12 АК'),
+    unitNode('УВ (с) "Північ"', [
+        unitNode('15 АК'),
+        unitNode('18 АК')
     ]),
-    unitNode('16 АК'),
-    unitNode('10 АК'),
-    unitNode('3 АК')
-  ]),
-  unitNode('УВ (с) "Північ"'),
-  unitNode('УОС',[
-    unitNode('11 АК'),
-    unitNode('19 АК',[
-      unitNode('1 КНГУ "Азов"'),
-      unitNode('7 КШР'),
-      unitNode('Покровський н.')
+    unitNode('УОС"',[
+        unitNode('14 АК'),
+        unitNode('2 КНГУ "Хартія"'),
+        unitNode('16 АК'),
+        unitNode('10 АК'),
+        unitNode('3 АК')
     ]),
-    unitNode('9 АК')
-  ]),
-  unitNode('УВ (с) "Схід"',[
-    unitNode('20 АК',[
-      unitNode('Олександрівський н.')
+    unitNode('УВ (с) "Схід"',[
+        unitNode('11 АК'),
+        unitNode('19 АК'),
+        unitNode('1 КНГУ "Азов"'),
+        unitNode('7 КШР'),
+        unitNode('Покровський н.'),
+        unitNode('9 АК')
     ]),
-    unitNode('17 АК',[
-      unitNode('30 КМП'),
-      unitNode('ОТУ "Одеса"')
+    unitNode('УВ (с) "Південь"',[
+        unitNode('20 АК'),
+        unitNode('Олександрівський н.'),
+        unitNode('17 АК'),
+        unitNode('30 КМП'),
+        unitNode('ОТУ "Одеса"')
     ])
-  ]),
-  unitNode('УВ (с) "Південь"')
 ]);
 
 const GROUP_NAMES=Object.freeze(UNIT_HIERARCHY.map(node=>node.name));
