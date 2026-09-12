@@ -11,6 +11,9 @@ const APP_CONFIG=Object.freeze({
     contextWindowDays:30,
     contextBeforeDays:14,
     contextAfterDays:15
+  }),
+  performance:Object.freeze({
+    aggregateCacheEntries:384
   })
 });
 
