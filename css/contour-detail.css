@@ -5,3 +5,9 @@
 @media(max-width:1100px){.drone-type-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:650px){.metric-card-paired{flex-basis:235px;max-width:265px}.metric-pair strong{font-size:27px}.drone-type-grid{grid-template-columns:repeat(2,minmax(0,1fr));padding:15px 16px 12px;gap:9px}.drone-type{padding:12px;gap:10px}.drone-type-name{font-size:12px;min-height:35px}.drone-type-number{font-size:25px}.drone-types .panel-heading{flex-direction:column;gap:12px}.drone-type-number small{font-size:10px}.drone-source-note{padding:0 16px 16px;font-size:11px}.distribution-controls button{min-height:40px}.paired-focus .context-row{gap:12px}.drone-type-name{overflow-wrap:anywhere}}
 @media(max-width:650px){.drone-type-grid{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;scroll-padding-left:16px;scrollbar-width:thin;scrollbar-color:#515b58 transparent}.drone-type{flex:0 0 158px;scroll-snap-align:start}.drone-source-note{padding-top:4px}}
+
+/* Unified line/bar controls: mirror the BpS chart-mode buttons. */
+#analysis-grid .segmented{border:0;padding:0;gap:4px}
+#analysis-grid .segmented button,#detail-dialog .detail-chart-controls button{display:flex;align-items:center;justify-content:center;width:28px;height:28px;min-height:28px;padding:3px;border:1px solid #414847;border-radius:4px;color:#7e898d;background:transparent}
+#analysis-grid .segmented button.active,#analysis-grid .segmented button[aria-pressed=true],#detail-dialog .detail-chart-controls button[aria-pressed=true]{color:var(--gold);background:#ffffff0b;border-color:var(--gold)}
+#analysis-grid .segmented .icon,#detail-dialog .detail-chart-controls .icon{width:16px;height:16px}
