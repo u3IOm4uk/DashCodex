@@ -1,6 +1,6 @@
 # Поточний стан
 
-Оновлено: **2026-09-13**. Етапи 1–5, hierarchy ordering/tree animation, detail unit breakdown та інтерактивні графіки інтегровані у стабільний `main`; конструктор міжкатегорійного порівняння реалізується у feature-гілці.
+Оновлено: **2026-09-13**. Етапи 1–5, hierarchy ordering/tree animation, detail unit breakdown, інтерактивні графіки та конструктор міжкатегорійного порівняння інтегровані у стабільний `main`.
 
 ## Поточна реалізація
 
@@ -49,10 +49,10 @@
 - T08: profiling великої книги, Safari/Firefox і фізичних пристроїв.
 - Acceptance policy книги лише з персоналом/БК не розширена.
 - Одиниця територій не підтверджена; формули Excel не перераховуються.
-- Після стабілізації конструктора можна прибрати повторний lazy parse через явний read-only runtime bridge з основного orchestration, якщо це буде виправдано профілюванням.
+- За результатами профілювання можна прибрати повторний lazy parse конструктора через явний read-only runtime bridge з основного orchestration, якщо це буде виправдано вимірами.
 
 ## Поточний фокус
 
-Feature-гілка `feature/cross-category-comparison` містить першу версію конструктора порівняння. Перед інтеграцією перевірити syntax/resource revision, change-scoped browser scenarios та responsive layout; не змінювати `UNIT_HIERARCHY`, Excel schema, normalized records або базову aggregate math без прямої потреби задачі.
+Стабільний `main` містить інтегрований конструктор міжкатегорійного порівняння. Подальші зміни конструктора мають зберігати `UNIT_HIERARCHY`, Excel schema, normalized records і базову aggregate math без прямої потреби їх змінювати; для responsive/layout змін застосовувати відповідний change-scoped browser coverage.
 
-Базовий `main` перед початком цієї роботи: `4b1af2baa0360ec7d2a203cfb045a2d20c0e3a98`; його GitHub Actions `Change-scoped quality` завершився успішно.
+Інтеграція конструктора виконана через PR #11. Повторний pre-merge `Change-scoped quality` пройшов успішно, а post-merge run #79 для `main` також завершився успішно.
