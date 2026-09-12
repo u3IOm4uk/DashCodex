@@ -54,12 +54,16 @@ Runtime складається з:
 - `js/contour-view.js` — pure formatting/escaping/icon helpers;
 - `js/contour-charts.js` — pure chart option/SVG builders;
 - `js/contour.js` — state, DOM orchestration, import/export, navigation, dialogs і chart lifecycle;
+- `js/contour-compare.js` — окремий UI/runtime конструктора міжкатегорійного порівняння: каталог до 6 серій, незалежний період, unit scope, нормалізований/абсолютний графік і hierarchy-таблиця поверх чинних `ContourData.parse()` / `aggregate()`;
 - `js/xlsx.full.min.js`, `js/apexcharts.js` — локальні сторонні бібліотеки;
-- чотири `contour*.css`, `fonts/`, `img/` і `Накопичення.xlsx`.
+- `css/contour-compare.css` — триколонковий desktop layout та mobile picker/fixed-panel поведінка конструктора порівняння;
+- інші чотири `contour*.css`, `fonts/`, `img/` і `Накопичення.xlsx`.
 
 Перед `parse()` книга проходить структурну перевірку. Parsed-модель використовує lazy indexes і bounded LRU aggregate cache; новий імпорт отримує ізольований cache. Це оптимізація повторних обчислень, а не зміна аналітичної математики.
 
-Legacy hidden sidebar і старий donut-host вилучені з runtime DOM. Desktop/tablet мають видимий доступ до «Джерело» в шапці, mobile — через нижню навігацію. Якщо у структурі частина значень відсутня, UI явно пояснює, що `null` не прирівнюється до нуля.
+Конструктор порівняння не змінює основний analytics state або Excel-схему. Він ліниво працює з тією самою локальною книгою через той самий `ContourData`-контракт; нормалізація є лише presentation-transform для графіка, а таблиця зберігає абсолютні значення джерела.
+
+Legacy hidden sidebar і старий donut-host вилучені з runtime DOM. На mobile нижня навігація містить `Огляд / Розділи / Порівняння`; порівняння відкривається над нею без приховування нижнього меню. Якщо у структурі частина значень відсутня, UI явно пояснює, що `null` не прирівнюється до нуля.
 
 ## Важливо
 
