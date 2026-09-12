@@ -1,0 +1,36 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Node / build artifacts (not used by active runtime, ignored if created locally)
+node_modules/
+dist/
+build/
+coverage/
+
+# Local caches and temporary files
+.cache/
+.tmp/
+tmp/
+*.log
+*.bak
+*.swp
+
+# Local environment / secrets
+.env
+.env.*
+!.env.example
+
+# Office lock/temp files
+~$*.xlsx
+~$*.xls
+~$*.xlsm
