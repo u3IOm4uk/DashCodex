@@ -5,3 +5,12 @@
 @media(max-width:1100px){.drone-type-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:650px){.metric-card-paired{flex-basis:235px;max-width:265px}.metric-pair strong{font-size:27px}.drone-type-grid{grid-template-columns:repeat(2,minmax(0,1fr));padding:15px 16px 12px;gap:9px}.drone-type{padding:12px;gap:10px}.drone-type-name{font-size:12px;min-height:35px}.drone-type-number{font-size:25px}.drone-types .panel-heading{flex-direction:column;gap:12px}.drone-type-number small{font-size:10px}.drone-source-note{padding:0 16px 16px;font-size:11px}.distribution-controls button{min-height:40px}.paired-focus .context-row{gap:12px}.drone-type-name{overflow-wrap:anywhere}}
 @media(max-width:650px){.drone-type-grid{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;scroll-padding-left:16px;scrollbar-width:thin;scrollbar-color:#515b58 transparent}.drone-type{flex:0 0 158px;scroll-snap-align:start}.drone-source-note{padding-top:4px}}
+
+/* Chart controls use the compact BpS mode-button visual language. */
+body .trend-panel .segmented{gap:4px;background:transparent}
+body .trend-panel .segmented button,body .detail-chart-controls button{display:flex;align-items:center;justify-content:center;flex:0 0 28px;width:28px;height:28px;min-height:28px;padding:3px;border:1px solid #414847;border-radius:4px;background:transparent;color:#8e9a9f}
+body .trend-panel .segmented button.active,body .trend-panel .segmented button[aria-pressed=true],body .detail-chart-controls button[aria-pressed=true]{color:var(--gold);background:#ffffff0b;border-color:var(--gold)}
+body .trend-panel .segmented .icon,body .detail-chart-controls .icon{width:16px;height:16px}
+body .chart-controls .graph-tabs{gap:4px}
+body .chart-controls .graph-tabs button,body .chart-period-controls button{min-height:28px;padding:3px 8px;border:1px solid #414847;border-radius:4px;background:transparent;color:#8e9a9f;font-size:11px;line-height:20px}
+body .chart-controls .graph-tabs button[aria-pressed=true],body .chart-period-controls button[aria-pressed=true]{color:var(--gold);background:#ffffff0b;border-color:var(--gold)}
