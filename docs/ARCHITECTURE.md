@@ -115,7 +115,7 @@ Preset «Увесь період» може бути ширшим за manual UX
 - Excel formulas не перераховуються;
 - CSV: UTF-8 BOM, `;`, CRLF, null → empty field, formula-like prefixes escaped;
 - `Запустити.cmd` bind only `127.0.0.1:8080`;
-- current branch first-party resource revision — **33**.
+- first-party resource revision визначається `?v=` у `index.html`; поточний знімок — у [CURRENT_STATE.md](CURRENT_STATE.md).
 
 ## Репозиторій і quality gate
 
