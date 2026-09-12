@@ -25,6 +25,7 @@ npx playwright install chromium
 |---|---|
 | лише docs | без runtime/browser tests |
 | first-party JS | `node --check` тільки змінених JS |
+| `index.html` / resource-version script | `scripts/resource-version.cjs --check` |
 | `contour-config`, `contour-data`, workbook, adapter test | `.audit/verify-contour.cjs` |
 | UI/DOM/CSS/runtime | `tests/browser/core.spec.cjs` |
 | sticky/navigation-related diff | `tests/browser/sticky.spec.cjs` |
@@ -38,13 +39,35 @@ npx playwright install chromium
 
 Workflow: `.github/workflows/quality.yml`.
 
-Він має три основні jobs:
+Основні jobs:
 
 1. `scope` — визначає релевантні перевірки;
-2. `syntax` / `regression` — запускаються тільки за відповідним scope;
-3. `browser` — встановлює Playwright/Chromium і запускає тільки обрані spec-файли.
+2. `syntax` — тільки змінені first-party JS;
+3. `resource-version` — тільки при зміні `index.html` або versioning script;
+4. `regression` — тільки data/schema/aggregate scope;
+5. `browser` — тільки релевантні Playwright specs.
 
 Push у `main` і кожен pull request отримують автоматичний pass/fail лише за релевантними перевірками.
+
+## Resource revision
+
+Перевірка:
+
+```sh
+npm run version:check
+```
+
+Підняти всі first-party `?v=` одночасно:
+
+```sh
+npm run version:bump
+```
+
+Або встановити конкретну revision:
+
+```sh
+node scripts/resource-version.cjs 31
+```
 
 ## Regression contract даних
 
