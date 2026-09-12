@@ -49,11 +49,13 @@ Runtime складається з:
 - `index.html` — чинний DOM та підключення ресурсів;
 - `js/contour-config.js` — Excel/runtime/date/performance config;
 - `js/contour-data.js` — validation, parse/normalization, lazy indexes, aggregate cache, агрегація й date helpers;
+- `js/contour-units.js` — представлення ієрархії з `UNIT_HIERARCHY`, розгортання та локальні статуси підрозділів;
+- `js/contour-navigation.js` — навігація категорій зі збереженням sticky/compact стану;
 - `js/contour-view.js` — pure formatting/escaping/icon helpers;
 - `js/contour-charts.js` — pure chart option/SVG builders;
 - `js/contour.js` — state, DOM orchestration, import/export, navigation, dialogs і chart lifecycle;
 - `js/xlsx.full.min.js`, `js/apexcharts.js` — локальні сторонні бібліотеки;
-- три `contour*.css`, `fonts/`, `img/` і `Накопичення.xlsx`.
+- чотири `contour*.css`, `fonts/`, `img/` і `Накопичення.xlsx`.
 
 Перед `parse()` книга проходить структурну перевірку. Parsed-модель використовує lazy indexes і bounded LRU aggregate cache; новий імпорт отримує ізольований cache. Це оптимізація повторних обчислень, а не зміна аналітичної математики.
 
@@ -61,6 +63,6 @@ Legacy hidden sidebar і старий donut-host вилучені з runtime DOM
 
 ## Важливо
 
-Книга не перезаписується й не надсилається зовнішнім сервісам. Імпорт і фільтри живуть лише до перезавантаження. Дані тестові, дати аркушів різні; у вартості ОВгП є помилки джерела, одиниця площі територій не вказана.
+Книга не перезаписується й не надсилається зовнішнім сервісам. Імпорт і фільтри живуть лише до перезавантаження. Статуси видимості й архіву підрозділів зберігаються в localStorage як локальні налаштування UI; дані книги не зберігаються в ньому. Дані тестові, дати аркушів різні; у вартості ОВгП є помилки джерела, одиниця площі територій не вказана.
 
 Початковий HTML — `.audit/index.original.html`. Історичні матеріали не замінюють чинну специфікацію й поточний стан.
