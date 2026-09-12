@@ -27,8 +27,9 @@
 - Для leaf-вузла detail-таблиця лишається без hierarchy breakdown.
 - Hierarchy breakdown використовує ті самі базові стилі клітинок, типографіку та розділювачі, що й звичайна detail-таблиця; дочірній рівень позначається лише відступом назви.
 - Вертикальні проміжки у `#detail-dialog` між заголовком, вступом, summary/trend, поясненням і таблицею ущільнені без зміни розміру клітинок таблиці.
-- Поточний browser test перевіряє точну відповідність detail child rows масиву `catalog.index[parent].children`.
-- Для цієї гілки first-party resource revision: **37**.
+- `#detail-dialog > .sheet-heading` має локальний `margin-bottom: 10px` (`8px` на mobile), а перемикачі line/bar розташовані праворуч в одному горизонтальному блоці з `Тенденція + період`.
+- Поточний browser test перевіряє direct children, компактний відступ заголовка detail-dialog і горизонтальне розташування trend controls.
+- Для цієї гілки first-party resource revision: **38**.
 
 ## Відкритий технічний борг
 
