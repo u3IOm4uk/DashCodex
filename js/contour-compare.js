@@ -26,6 +26,7 @@ const unitMeta=new Map();
 function indexUnits(nodes,parent=null,depth=0){for(const node of nodes||[]){unitMeta.set(node.name,{node,parent,depth});indexUnits(node.children,node.name,depth+1)}}
 indexUnits(C.UNIT_HIERARCHY);
 function descendantNames(name,out=[]){const meta=unitMeta.get(name);for(const child of meta?.node.children||[]){out.push(child.name);descendantNames(child.name,out)}return out}
+function directChildNames(name){return (unitMeta.get(name)?.node.children||[]).map(child=>child.name)}
 function ancestorNames(name){const out=[];let parent=unitMeta.get(name)?.parent;while(parent){out.push(parent);parent=unitMeta.get(parent)?.parent}return out}
 
 function modelBounds(){
@@ -171,30 +172,48 @@ function tableData(days,items){
  const units=[...selectedUnits],scopedItems=items.filter(item=>item.supportsUnit),globalItems=items.filter(item=>!item.supportsUnit);
  if(!units.length||!scopedItems.length){
   const values=new Map(items.map(item=>[item.id,sourceSeries(item,days)]));
-  return {showUnit:false,rows:days.map((day,index)=>({day,unit:null,values:items.map(item=>values.get(item.id)[index])}))};
+  return {showUnit:false,hierarchy:false,childCount:0,rows:days.map((day,index)=>({day,values:items.map(item=>values.get(item.id)[index])}))};
  }
- const scoped=new Map();
- for(const unit of units)for(const item of scopedItems)scoped.set(`${unit}\u001f${item.id}`,sourceSeries(item,days,unit));
- const globals=new Map(globalItems.map(item=>[item.id,sourceSeries(item,days)])),detail=[];
- days.forEach((day,index)=>{
-  for(const unit of units)detail.push({day,unit,values:items.map(item=>item.supportsUnit?scoped.get(`${unit}\u001f${item.id}`)[index]:null)});
-  if(globalItems.length)detail.push({day,unit:'Загальні показники',values:items.map(item=>item.supportsUnit?null:globals.get(item.id)[index])});
- });
- return {showUnit:true,rows:detail};
+ const blocks=units.map(parent=>{const children=directChildNames(parent);return {parent,children,entries:[parent,...children]}}),unitNames=[...new Set(blocks.flatMap(block=>block.entries))],scoped=new Map();
+ for(const unit of unitNames)for(const item of scopedItems)scoped.set(`${unit}\u001f${item.id}`,sourceSeries(item,days,unit));
+ const globals=new Map(globalItems.map(item=>[item.id,sourceSeries(item,days)]));
+ return {
+  showUnit:true,hierarchy:true,childCount:blocks.reduce((sum,block)=>sum+block.children.length,0),
+  days:days.map((day,index)=>({
+   day,
+   blocks:blocks.map(block=>({parent:block.parent,rows:block.entries.map((unit,rowIndex)=>({unit,kind:rowIndex?'child':'parent',values:items.map(item=>item.supportsUnit?scoped.get(`${unit}\u001f${item.id}`)[index]:null)}))})),
+   global:globalItems.length?{unit:'Загальні показники',values:items.map(item=>item.supportsUnit?null:globals.get(item.id)[index])}:null
+  }))
+ };
 }
 
 function renderTable(rows){
- const head=$('#compare-table-head'),body=$('#compare-table-body'),foot=$('#compare-table-foot'),items=rows.series.map(series=>series.item),detail=tableData(rows.days,items);
- const headerName=item=>item.categoryName===item.name?item.name:`${item.categoryName} · ${item.name}`;
+ const head=$('#compare-table-head'),body=$('#compare-table-body'),foot=$('#compare-table-foot'),note=$('#compare-unit-breakdown-note'),table=head.closest('table'),items=rows.series.map(series=>series.item),detail=tableData(rows.days,items);
+ const headerName=item=>item.categoryName===item.name?item.name:`${item.categoryName} · ${item.name}`,valueHtml=value=>value===null||value===undefined?'—':esc(fmt(value));
+ table?.classList.toggle('detail-hierarchy-table',detail.hierarchy);
  head.innerHTML=`<tr><th>Дата</th>${detail.showUnit?'<th>Підрозділ</th>':''}${rows.series.map(series=>`<th><span style="color:${series.color}">●</span> ${esc(headerName(series.item))}</th>`).join('')}</tr>`;
- body.innerHTML=detail.rows.map(row=>`<tr><td>${fullDate(row.day)}</td>${detail.showUnit?`<td class="compare-unit-cell">${esc(row.unit)}</td>`:''}${row.values.map(value=>`<td>${value===null||value===undefined?'—':fmt(value)}</td>`).join('')}</tr>`).join('');
- if(foot){const globalNote=detail.showUnit&&items.some(item=>!item.supportsUnit)?' · глобальні показники окремим рядком':'';foot.textContent=`Абсолютні значення джерела · ${rows.days.length} дн. · ${items.length} показн.${detail.showUnit?` · ${selectedUnits.size} підрозд.`:''}${globalNote}`}
+ if(!detail.hierarchy){
+  body.innerHTML=detail.rows.map(row=>`<tr><td>${fullDate(row.day)}</td>${row.values.map(value=>`<td>${valueHtml(value)}</td>`).join('')}</tr>`).join('');
+ }else{
+  body.innerHTML=detail.days.map(group=>{
+   const blocks=group.blocks.map(block=>{
+    const parent=block.rows[0],span=block.rows.length;
+    const parentRow=`<tr class="detail-unit-parent" data-detail-date="${esc(group.day)}" data-detail-unit="${esc(parent.unit)}"><th scope="rowgroup" rowspan="${span}" class="detail-unit-date">${esc(fullDate(group.day))}</th><th scope="row" class="detail-unit-name"><strong>${esc(parent.unit)}</strong><small>загальний показник</small></th>${parent.values.map(value=>`<td>${valueHtml(value)}</td>`).join('')}</tr>`;
+    const childRows=block.rows.slice(1).map(row=>`<tr class="detail-unit-child" data-detail-date="${esc(group.day)}" data-detail-unit="${esc(row.unit)}" data-detail-parent="${esc(block.parent)}"><th scope="row" class="detail-unit-name"><span aria-hidden="true">↳</span>${esc(row.unit)}</th>${row.values.map(value=>`<td>${valueHtml(value)}</td>`).join('')}</tr>`).join('');
+    return parentRow+childRows;
+   }).join('');
+   const globalRow=group.global?`<tr class="compare-global-row"><th scope="row" class="detail-unit-date">${esc(fullDate(group.day))}</th><th scope="row" class="detail-unit-name">${esc(group.global.unit)}</th>${group.global.values.map(value=>`<td>${valueHtml(value)}</td>`).join('')}</tr>`:'';
+   return blocks+globalRow;
+  }).join('');
+ }
+ if(note){note.hidden=!(detail.hierarchy&&detail.childCount);note.textContent='Нижче показані вибрані батьківські підрозділи та лише їхні безпосередньо підпорядковані підрозділи. Батьківський рядок — власний показник джерела і не є сумою дочірніх.'}
+ if(foot){const childNote=detail.childCount?` · + ${detail.childCount} безпосередніх дочірніх`:'';const globalNote=detail.showUnit&&items.some(item=>!item.supportsUnit)?' · глобальні показники окремим рядком':'';foot.textContent=`Абсолютні значення джерела · ${rows.days.length} дн. · ${items.length} показн.${detail.showUnit?` · ${selectedUnits.size} обр. підрозд.${childNote}`:''}${globalNote}`}
 }
 
 function renderAnalysis(){
  if(!model||!range.from||!range.to)return;syncButtons();
  const items=selectedItems(),status=$('#compare-status');
- if(!items.length){chart?.destroy();chart=null;$('#compare-chart').innerHTML='';$('#compare-table-head').innerHTML='';$('#compare-table-body').innerHTML='';if($('#compare-table-foot'))$('#compare-table-foot').textContent='';status.hidden=false;status.textContent='Оберіть показники у блоці «Показники».';return}
+ if(!items.length){chart?.destroy();chart=null;$('#compare-chart').innerHTML='';$('#compare-table-head').innerHTML='';$('#compare-table-body').innerHTML='';if($('#compare-table-foot'))$('#compare-table-foot').textContent='';if($('#compare-unit-breakdown-note'))$('#compare-unit-breakdown-note').hidden=true;status.hidden=false;status.textContent='Оберіть показники у блоці «Показники».';return}
  const validation=D.validateDateRange(range.from,range.to);if(!validation.valid){status.hidden=false;status.textContent=validation.reason;return}
  status.hidden=true;const rows=analysisRows();
  chart?.destroy();chart=null;$('#compare-chart').innerHTML='';
