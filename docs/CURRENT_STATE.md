@@ -26,8 +26,9 @@
 - Батьківські та дочірні значення читаються окремими `aggregate(..., group)` викликами; дочірні рядки не сумуються в parent і не змінюють normalized records.
 - Для leaf-вузла detail-таблиця лишається без hierarchy breakdown.
 - Hierarchy breakdown використовує ті самі базові стилі клітинок, типографіку та розділювачі, що й звичайна detail-таблиця; дочірній рівень позначається лише відступом назви.
+- Вертикальні проміжки у `#detail-dialog` між заголовком, вступом, summary/trend, поясненням і таблицею ущільнені без зміни розміру клітинок таблиці.
 - Поточний browser test перевіряє точну відповідність detail child rows масиву `catalog.index[parent].children`.
-- Для цієї гілки first-party resource revision: **36**.
+- Для цієї гілки first-party resource revision: **37**.
 
 ## Відкритий технічний борг
 
