@@ -26,7 +26,7 @@ const unitMeta=new Map();
 function indexUnits(nodes,parent=null,depth=0){for(const node of nodes||[]){unitMeta.set(node.name,{node,parent,depth});indexUnits(node.children,node.name,depth+1)}}
 indexUnits(C.UNIT_HIERARCHY);
 function descendantNames(name,out=[]){const meta=unitMeta.get(name);for(const child of meta?.node.children||[]){out.push(child.name);descendantNames(child.name,out)}return out}
-function directChildNames(name){return (unitMeta.get(name)?.node.children||[]).map(child=>child.name)}
+function directChildNames(name){const runtime=root.ContourUnits?.catalog?.index?.[name]?.children;if(Array.isArray(runtime))return [...runtime];return (unitMeta.get(name)?.node.children||[]).map(child=>child.name)}
 function ancestorNames(name){const out=[];let parent=unitMeta.get(name)?.parent;while(parent){out.push(parent);parent=unitMeta.get(parent)?.parent}return out}
 
 function modelBounds(){
