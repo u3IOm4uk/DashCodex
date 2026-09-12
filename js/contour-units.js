@@ -115,7 +115,7 @@ function decorateRow(row,node){
   row.classList.add('unit-row',`unit-level-${node.level}`);if(node.ambiguous)row.classList.add('unit-ambiguous');
   const cell=row.querySelector('td:first-child'),button=row.querySelector('.row-button'),name=button?.querySelector('.row-name');if(!cell||!button||!name)return;
   if(node.children.length){
-    row.classList.add('unit-parent');
+    row.classList.add('unit-parent');button.setAttribute('aria-label',`Розгорнути: ${node.name}`);
     const expand=document.createElement('button');expand.type='button';expand.className='unit-expand';expand.setAttribute('aria-label',`Розгорнути: ${node.name}`);expand.onclick=event=>{event.preventDefault();event.stopPropagation();toggle(node.name)};cell.insertBefore(expand,button);
     const detail=document.createElement('button');detail.type='button';detail.className='unit-detail';detail.textContent='↗';detail.setAttribute('aria-label',`Відкрити деталі: ${node.name}`);detail.onclick=event=>{event.preventDefault();event.stopPropagation();bypassDetail=node.name;button.click();bypassDetail=null};cell.append(detail);
   }
@@ -126,7 +126,7 @@ function applyTableState(){
   if(typeof document==='undefined')return;ensureControls();ensureDialog();const controls=document.querySelector('#unit-controls');if(controls)controls.hidden=!isOpsTable();if(!isOpsTable())return;
   const archiveToggle=document.querySelector('#unit-archive-toggle');if(archiveToggle){archiveToggle.setAttribute('aria-pressed',String(showArchived));const count=catalog.nodes.filter(n=>statusOf(n.name)===STATUS.ARCHIVED).length;archiveToggle.textContent=`Архів${count?' · '+count:''}`}
   const rows=[...document.querySelectorAll('#table-body tr')];
-  for(const row of rows){const name=clean(row.querySelector('.row-name')?.textContent),node=nodeOf(name);if(!node)continue;decorateRow(row,node);const status=statusOf(node.name);row.classList.toggle('unit-status-archived',status===STATUS.ARCHIVED);row.classList.toggle('unit-status-hidden',status===STATUS.HIDDEN);row.hidden=!visibleNode(node);const expand=row.querySelector('.unit-expand');if(expand){const open=expanded.has(node.name);expand.setAttribute('aria-expanded',String(open));expand.textContent=open?'−':'+';expand.setAttribute('aria-label',`${open?'Згорнути':'Розгорнути'}: ${node.name}`)}}
+  for(const row of rows){const name=clean(row.querySelector('.row-name')?.textContent),node=nodeOf(name);if(!node)continue;decorateRow(row,node);const status=statusOf(node.name);row.classList.toggle('unit-status-archived',status===STATUS.ARCHIVED);row.classList.toggle('unit-status-hidden',status===STATUS.HIDDEN);row.hidden=!visibleNode(node);const expand=row.querySelector('.unit-expand');if(expand){const open=expanded.has(node.name);expand.setAttribute('aria-expanded',String(open));expand.textContent=open?'−':'+';expand.setAttribute('aria-label',`${open?'Згорнути':'Розгорнути'}: ${node.name}`);const rowButton=row.querySelector('.row-button');if(rowButton)rowButton.setAttribute('aria-label',`${open?'Згорнути':'Розгорнути'}: ${node.name}`)}}
 }
 function requestRefresh(){if(typeof document==='undefined'||refreshQueued)return;refreshQueued=true;queueMicrotask(()=>{refreshQueued=false;applyTableState()})}
 function bootDom(){
