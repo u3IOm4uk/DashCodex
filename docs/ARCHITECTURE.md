@@ -1,110 +1,136 @@
 # Архітектура
 
-Актуалізовано: 2026-09-12. Проєкт зберігається у приватному GitHub-репозиторії. Активний КОНТУР — статичний застосунок без build-system, backend і package manager для runtime.
+Актуалізовано: 2026-09-12. Проєкт зберігається у приватному GitHub-репозиторії. Активний КОНТУР — статичний застосунок без build-system і backend; npm використовується лише для test tooling.
 
 ## Активний runtime
 
 | Компонент | Відповідальність |
 |---|---|
 | `index.html` | Чинний DOM, доступні назви, підключення ресурсів, діалоги, шапка, dock і панелі |
-| `js/contour-config.js` | `APP_CONFIG`, `WORKBOOK_SCHEMA`, основні угруповання, типи джерел, date/performance policy |
-| `js/contour-data.js` | Перевірка Excel-контракту, parse/normalization, метадані категорій, індекси, кеш aggregate, агрегація, date policy і порівняння |
-| `js/contour-view.js` | Pure view helpers: escaping, number/date formatting, SVG icons |
-| `js/contour-charts.js` | Pure chart builders: ApexCharts base/temporal options і SVG mini-bar |
-| `js/contour.js` | Runtime state, import/export, DOM orchestration, навігація, dialogs, chart lifecycle, sticky/scroll поведінка |
+| `js/contour-config.js` | `APP_CONFIG`, `WORKBOOK_SCHEMA`, основні угруповання, source/date/performance policy |
+| `js/contour-data.js` | Workbook validation, parse/normalization, metadata, indexes/cache, aggregate, dates і comparisons |
+| `js/contour-units.js` | UI-каталог ГОЧ, conservative hierarchy inference, unit statuses, archive/expand behavior |
+| `js/contour-view.js` | Pure escaping/format/date/icon helpers |
+| `js/contour-charts.js` | Pure ApexCharts option builders і mini-bar SVG |
+| `js/contour-navigation.js` | Targeted navigation adapter для category/sticky scroll behavior |
+| `js/contour.js` | Runtime state, import/export, DOM orchestration, dialogs, chart lifecycle, основний render |
 | `css/contour.css` | Базова тема, компоненти, адаптивність |
 | `css/contour-detail.css` | Парні показники й типи БпС |
-| `css/contour-refinement.css` | Чинні уточнення щільності, sticky/navigation та анімації; завантажується останнім |
-| `js/xlsx.full.min.js`, `js/apexcharts.js` | Локальні SheetJS та ApexCharts; CDN не потрібен |
-| `fonts/`, `img/` | Локальні шрифти й зображення |
-| `.audit/` | Адаптерні/regression перевірки, профіль книги, історичні ревізії та початковий HTML |
+| `css/contour-refinement.css` | Чинні уточнення sticky/navigation/щільності |
+| `css/contour-units.css` | Ієрархічна таблиця, archive/status manager |
+| `js/xlsx.full.min.js`, `js/apexcharts.js` | Локальні SheetJS та ApexCharts |
+| `.audit/` | Data/regression checks і workbook profiling |
+| `tests/browser/` | Change-scoped Playwright scenarios |
 | `Запустити.cmd` | Переносимий Windows launcher локального HTTP-сервера |
 
-Основний потік: **Excel → SheetJS.read → validateWorkbook → parse/normalize → lazy indexes/cache → sections/categories → aggregate → UI**. Критичні помилки схеми зупиняють імпорт до побудови моделі; некритичні відхилення зберігаються як validation warnings.
+Основний data flow: **Excel → SheetJS.read → validateWorkbook → parse/normalize → lazy indexes/cache → sections/categories → aggregate → UI**.
 
-Для часових графіків: `contextRange → aggregate → ContourCharts.temporalOptions → ApexCharts`. Для деталей угруповання використовується його ключ, а не загальний підсумок.
+Stage 5 додає окрему presentation-гілку після parse: **parsed GOCh records → ContourUnits.buildCatalog → hierarchy/status view → існуюча detail table**. Вона не змінює normalized records і не входить у aggregate math.
 
 ## Конфігурація та Excel-контракт
 
-`contour-config.js` є runtime source of truth для назви bundled workbook, ліміту імпорту, source kinds, політики дат, підтримуваних аркушів, підсумкових ключів, полів категорій/БпС, основних угруповань і межі aggregate cache.
+`contour-config.js` — runtime source of truth для bundled workbook, import limit, source kinds, date policy, workbook sheets, summary keys, category/drone fields, canonical top-level groups і aggregate cache limit.
 
-`validateWorkbook()` формує `errors` і `warnings`; `parse()` при критичній несумісності кидає `WorkbookValidationError` із деталями validation.
+`validateWorkbook()` формує `errors`/`warnings`; critical incompatibility зупиняє `parse()` через `WorkbookValidationError`.
 
 ## Aggregate indexes і cache
 
-Тільки data-моделі, створені `parse()`, позначаються cacheable. Для них `contour-data.js` ліниво будує індекси аркуша:
+Тільки data-моделі, створені `parse()`, є cacheable. Для них `contour-data.js` ліниво будує:
 
 - `date → rows`;
 - `date → group → rows`;
 - `date → type → rows`.
 
-Повторний `aggregate()` використовує LRU-кеш, ключ якого містить section/sheet, category id/type/fields, from/to та group. Межа визначена `APP_CONFIG.performance.aggregateCacheEntries`.
+Повторний `aggregate()` використовує bounded LRU cache. Ключ містить section/sheet, category id/type/fields, from/to та group. Новий import створює новий data-object, тому runtime cache ізольований через WeakMap.
 
-Новий імпорт завжди створює новий data-object, тому WeakMap-кеш нового джерела ізольований автоматично. `performanceStats()` і `clearPerformanceCaches()` існують для regression/profiling, а не як UI API.
+Safety cap може обмежити `days/series`, але `raw/rows/totals` зберігають повний фактичний from/to. `performanceStats()`/`clearPerformanceCaches()` — diagnostic API для regression/profiling, не UI state.
 
-Safety cap обмежує календарну `days/series`, але не змінює стару семантику `raw`, `rows` і `totals`: вони охоплюють усі фактичні записи джерела у запитаному from/to. `truncated` лише сигналізує, що календарний ряд був обмежений.
+## Ієрархія підрозділів
+
+`contour-units.js` підключається після `contour-data.js` і обгортає `ContourData.parse()`: після успішного parse будується окремий каталог з усіх GOCh records.
+
+Hierarchy inference:
+
+1. записи кожної дати впорядковуються за збереженим Excel row number;
+2. canonical name з `GROUP_NAMES` відкриває top-level group block;
+3. назва з шаблоном `АК` формує corps-level під поточним group;
+4. звичайні наступні rows прив’язуються до поточного corps або group;
+5. parent приймається тільки якщо для точної назви він однаковий у всіх спостереженнях;
+6. multi-parent case стає `ambiguous` root і не вгадується.
+
+Canonical `12 АК`, оскільки він уже top-level у `GROUP_NAMES`, лишається root попри збіг з corps naming heuristic.
+
+Ієрархія впливає тільки на представлення flat table: parent click toggles children, separate detail action викликає існуючий `showDetail()`. Батьківський numeric row не реконструюється з дітей.
+
+## Unit status і локальна persistence
+
+Для unit view існують status overrides:
+
+- `active` — звичайне відображення;
+- `hidden` — не показувати в робочій таблиці;
+- `archived` — приховувати за замовчуванням, але дозволити через archive toggle.
+
+Overrides зберігаються у `localStorage` за ключем `contour.unit-status.v1` і keyed exact unit name. Це **UI preference**, не operational data persistence: Excel, parsed model, aggregate cache і історичні records не змінюються.
+
+При new import каталог перебудовується; локальний override може повторно застосуватися, якщо точна назва збігається. Архівований row доступний тільки в period, де source реально має цей row; UI не синтезує відсутню історію.
 
 ## Джерело даних
 
-Runtime зберігає джерело як `{ kind, name }`. Filename не визначає bundled/user. Автоматично завантажена книга має `kind: bundled`; файл через File API — `kind: user`.
+Runtime source metadata: `{kind,name}`. Filename не визначає bundled/user. Автоматично fetched workbook — `bundled`; File API — `user`.
 
-Видимий desktop/tablet доступ до діалогу «Джерело» розташований у `.top-status`. На малих екранах `.top-status` ховається штатним breakpoint, а доступ лишається через нижню мобільну навігацію.
+Data workbook після reload завантажується заново; unit visibility/archive preference є єдиною Stage 5 локальною persistence, зафіксованою окремим рішенням D26.
 
 ## Дати
 
-`APP_CONFIG.datePolicy` визначає:
+`APP_CONFIG.datePolicy`:
 
-- ручний діапазон — максимум 366 включних календарних днів;
-- from === to — 1 день;
-- контекст доби — до 30 календарних позицій (-14/+15 зі зміщенням біля меж джерела);
-- safety cap aggregate — 4001 календарна позиція.
+- manual range максимум 366 inclusive calendar days;
+- from === to = 1 день;
+- context до 30 calendar positions (-14/+15 із boundary shift);
+- aggregate series safety cap 4001.
 
-Preset «Увесь період» може бути ширшим за ручний UI-ліміт; внутрішній cap застосовується лише до календарної series, не до totals.
+Preset «Увесь період» може бути ширшим за manual UX limit; safety cap не обрізає totals/raw rows.
 
-## Стан, render і модульні межі
+## State, render і модульні межі
 
-State залишається у замиканні `contour.js`: data/source, section/category, from/to, chart mode, territory mode, drone mode, distribution index, table state і chart instances.
+Основний analytics state лишається у closure `contour.js`: data/source, section/category, period, chart modes, distribution index, chart instances.
 
-`contour-view.js` і `contour-charts.js` не володіють state, не підписують events і не мутують DOM. Це навмисна межа: декомпозиція зменшує blast radius, але не вводить framework або нову state architecture.
+`contour-units.js` має власний presentation state (`catalog`, `expanded`, status overrides, showArchived) і не володіє analytics state. Він спостерігає rerender `#table-body` через `MutationObserver` і повторно накладає hierarchy state на нові rows.
 
-`render()` перебудовує релевантний DOM, знищує старі основні графіки й створює нові. `generation` відсікає застаріле асинхронне завершення. При помилці актуальний chart host отримує видимий error-state. Графіки dialogs мають окремий lifecycle.
+`contour-view.js`/`contour-charts.js` pure; `contour-navigation.js` не володіє data model. `generation` у main render відсікає stale async chart completion.
 
-## Навігація, sticky та DOM cleanup
+## Навігація і sticky
 
-Один `#metrics` постійно знаходиться у sticky `#workspace-dock`. `#dock-anchor`, rAF scroll handler, `is-scrolled`, `cards-away`, `categorySizeLock`, `followCategory` і `dragRail` зберігають попередню поведінку.
+Один `#metrics` живе у `#workspace-dock`. Compact/sticky стан не створює копію row і spacer.
 
-Legacy sidebar вилучений із DOM і `navigation()`; navigation sources тепер — `#inline-sections`, mobile/dialog `#sheet-sections` і `#sheet-categories`. Старий прихований `#distribution-chart` також вилучений; структура показника рендериться лише в `#distribution-legend`.
-
-Базові CSS-файли ще можуть містити історичні селектори для видаленого DOM. Їхнє глибоке каскадне чищення не змішується з функціональним refactor і потребує окремої browser-перевірки.
-
-## Структура показника і null
-
-`distribution()` зберігає `null` до render-рівня. Для побудови смуг використовуються лише невід’ємні числові значення. Якщо хоча б один елемент має `null`, UI явно пояснює, що частки пораховані лише за наявними числами і пропуски не прирівнюються до нуля.
+При category change у compact state `contour-navigation.js` перенаправляє scroll так, щоб pinned cards лишалися стисненими, а до робочої межі переміщався лише контент під ними. Full page top лишається для справді top-level navigation.
 
 ## Графіки та БпС
 
-`axisRange` відповідає за локальний масштаб мініграфіків, `integerAxis` — за цілі поділки основних/модальних осей. `ContourCharts` будує конфігурацію, а `contour.js` володіє lifecycle ApexCharts.
-
-Сім карток БпС мають незалежні локальні area/bar режими. Деталі угруповання агрегують сім типів за `row.name`; при спільному показі FPV має праву вісь, інші типи — ліву.
+`ContourCharts` формує chart options; `contour.js` володіє ApexCharts lifecycle. Сім drone cards мають локальні modes; multi-series details використовують окрему FPV axis при спільному показі.
 
 ## Імпорт, експорт і запуск
 
-- Початковий fetch — `APP_CONFIG.defaultWorkbook`; далі File API для `.xlsx/.xls/.xlsm`.
-- Acceptance policy вимагає заповнений ГОЧ або ОВгП.
-- Excel formulas не перераховуються; використовуються cached values.
-- CSV: UTF-8 BOM, `;`, CRLF, лапки; null → порожнє поле; початкові `= + @ -` екрануються апострофом.
-- `Запустити.cmd` запускає локальний HTTP server лише на `127.0.0.1:8080`.
-- Активні first-party CSS/JS у Stage 3 використовують узгоджену cache revision **30**.
+- initial fetch — `APP_CONFIG.defaultWorkbook`; File API підтримує `.xlsx/.xls/.xlsm`;
+- acceptance policy вимагає filled GOCh або OVGp;
+- Excel formulas не перераховуються;
+- CSV: UTF-8 BOM, `;`, CRLF, null → empty field, formula-like prefixes escaped;
+- `Запустити.cmd` bind only `127.0.0.1:8080`;
+- Stage 5 first-party resource revision — **31**.
 
-## Репозиторій і перевірки
+## Репозиторій і quality gate
 
-- `main` — перевірений стан; значущі зміни — окремі гілки/PR.
-- Stage 3: `refactor/performance-maintainability`, draft PR #3.
-- `.audit/verify-contour.cjs` перевіряє snapshot totals, schema/date contracts, aggregate cache/index behavior, import isolation, safety-cap semantics і pure helper modules.
-- Автоматичного CI/browser-suite ще немає; перед merge потрібен локальний FULL regression.
+- `main` — verified baseline; значуща робота йде через branch/PR.
+- `.github/workflows/quality.yml` аналізує diff через `scripts/quality-scope.cjs` і запускає тільки relevant jobs.
+- syntax — changed first-party JS only;
+- regression — data/schema/aggregate risk;
+- resource-version — `index.html`/revision tooling;
+- browser specs: `core`, `sticky`, `charts`, `bps`, `units`.
+- `units.spec.cjs` запускається лише для hierarchy/archive-related risk; BpS spec не запускається лише через unit hierarchy changes.
+- stale runs одного PR cancel через `concurrency`.
 
 ## Зони великого впливу
 
-Широкої перевірки потребують зміни в `WORKBOOK_SCHEMA`, aggregate/cache key semantics, null-агрегації, date policy, period/context, CSV, ApexCharts lifecycle, sticky/responsive layout і каскаді CSS.
+Wide review потрібен для `WORKBOOK_SCHEMA`, aggregate/cache semantics, null/date policy, CSV, global sticky/responsive DOM, hierarchy inference rules або зміни meaning `active/hidden/archived`.
 
-Велика книга все ще парситься в main thread. Індекси/кеш зменшують повторну роботу render, але реальний performance budget на цільових пристроях ще не виміряний.
+Велика книга все ще парситься у main thread; actual performance budget на target devices не встановлено.
