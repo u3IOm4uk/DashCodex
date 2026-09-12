@@ -1,12 +1,7 @@
 (async function(){
 'use strict';
-const D=ContourData,C=ContourConfig,$=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
-const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const fmt=v=>v===null||v===undefined?'—':new Intl.NumberFormat('uk-UA',{maximumFractionDigits:2}).format(v);
-const shortDate=d=>d?d.slice(8)+'.'+d.slice(5,7):'—';
-const fullDate=d=>d?shortDate(d)+'.'+d.slice(0,4):'—';
-const paths={grid:'M3 3h7v7H3z M14 3h7v7h-7z M3 14h7v7H3z M14 14h7v7h-7z',layers:'m12 3 10 5-10 5L2 8z M2 12l10 5 10-5 M2 16l10 5 10-5',activity:'M2 12h4l3-8 6 16 3-8h4',upload:'M12 16V3 m-5 5 5-5 5 5 M4 15v6h16v-6',download:'M12 3v13 m-5-5 5 5 5-5 M4 16v5h16v-5',calendar:'M4 5h16v16H4z M8 3v4 M16 3v4 M4 10h16',database:'M4 6c0-4 16-4 16 0s-16 4-16 0 M4 6v12c0 4 16 4 16 0V6 M4 12c0 4 16 4 16 0',sliders:'M3 6h18 M3 12h18 M3 18h18 M8 3v6 M16 9v6 M10 15v6',trend:'M3 17l6-6 4 3 8-10 M15 4h6v6',bars:'M4 20V12h3v8 M11 20V4h3v16 M18 20V8h3v12',donut:'M12 3v9h9 M9 3.5a9 9 0 1 0 11.5 11.5 M15 3.5a9 9 0 0 1 5.5 5.5'};
-const icon=n=>`<svg class="icon" aria-hidden="true" viewBox="0 0 24 24"><path d="${paths[n]||paths.grid}"/></svg>`;
+const D=ContourData,C=ContourConfig,V=ContourView,H=ContourCharts,$=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
+const {esc,fmt,shortDate,fullDate,icon}=V;
 $$('[data-icon]').forEach(el=>el.innerHTML=icon(el.dataset.icon));
 let data,sections,section,category,from,to,chartType='area',charts=[],current,tableRows=[],source=C.source(C.APP_CONFIG.sourceKinds.BUNDLED,C.APP_CONFIG.defaultWorkbook),generation=0;
 let distributionIndex=0,graphMode='dynamics',detailChart=null,detailObserver=null;
@@ -56,10 +51,9 @@ function droneCategory(type){const base=section.categories.find(c=>c.id==='drone
 function droneBreakdown(){return D.droneTypes.map(type=>({...type,value:D.aggregate(data,section,droneCategory(type),from,to).totals[0]}))}
 function miniChart(values,color,mode,days){
  if(mode==='area')return spark(values,color);
- const limits=D.axisRange(values),width=220,height=48,y=v=>height-(v-limits.min)/(limits.max-limits.min)*height+4,zero=y(Math.max(limits.min,0)),step=width/Math.max(values.length,1);
- return `<svg viewBox="0 0 220 58" preserveAspectRatio="none" role="img" aria-label="Динаміка стовпчиками"><line x1="0" x2="220" y1="${zero}" y2="${zero}" stroke="#65716c" opacity=".4"/>${values.map((v,i)=>v===null?'':`<rect x="${i*step+step*.15}" y="${Math.min(y(v),zero)}" width="${Math.max(1,step*.7)}" height="${Math.max(1,Math.abs(y(v)-zero))}" rx="1" fill="${color}"><title>${fullDate(days[i])}: ${fmt(v)}</title></rect>`).join('')}${from===to?`<line x1="${(days.indexOf(from)+.5)*step}" x2="${(days.indexOf(from)+.5)*step}" y1="0" y2="58" stroke="#c2bd51" stroke-dasharray="3 3"/>`:''}</svg>`;
+ return H.miniBar({dataApi:D,values,color,days,selectedDay:from===to?from:null,fmt,fullDate});
 }
-const modeLabel=m=>({area:'Лінійний графік',bar:'Стовпчиковий графік'}[m]);
+const modeLabel=H.modeLabel;
 function renderDroneTypes(){
  const panel=$('#drone-types'),previousScroll=panel.querySelector('.drone-type-grid')?.scrollLeft||0;
  panel.hidden=category.id!=='drones';$('#drone-anchor').hidden=panel.hidden;if(panel.hidden){panel.innerHTML='';panel.classList.remove('drone-compact');return}
@@ -73,18 +67,8 @@ function renderDroneTypes(){
  $$('[data-mini]').forEach(b=>b.onclick=()=>{const id=b.dataset.mini,mode=b.dataset.mode,item=cache.get(id),card=b.closest('.drone-type');droneModes[id]=mode;card.querySelector('.drone-mini').innerHTML=miniChart(item.raw,item.r.color,mode,item.days);card.querySelectorAll('[data-mini]').forEach(x=>x.setAttribute('aria-pressed',x===b));});
  $('#drone-overview').onclick=()=>{category=droneCategory({id:'other'});distributionIndex=0;render()};
 }
-function chartOptions(){return {chart:{fontFamily:'Exo,Arial,sans-serif',foreColor:'#8e9a9f',background:'transparent',toolbar:{show:false},animations:{enabled:!matchMedia('(prefers-reduced-motion: reduce)').matches,speed:450},parentHeightOffset:0},theme:{mode:'dark'},grid:{borderColor:'#343b3e',strokeDashArray:3,padding:{left:8,right:17}},tooltip:{theme:'dark'},dataLabels:{enabled:false},legend:{fontSize:'11px',position:'top',horizontalAlign:'left',markers:{size:4},itemMargin:{horizontal:9,vertical:4}},stroke:{width:2.2,curve:'straight'},noData:{text:'Немає даних'},states:{hover:{filter:{type:'lighten',value:.12}}}}}
 function temporalOptions(a,labels,colors,height=260,balance=false,mode=chartType){
- const o=chartOptions(),single=from===to,t=Date.parse(from+'T12:00:00Z');
- let series=balance?[{name:'Відновлено − втрачено',data:a.days.map((d,j)=>({x:Date.parse(d+'T12:00:00Z'),y:a.series.every(s=>s[j]!==null)?a.series[0][j]-a.series[1][j]:null}))}]:labels.map((name,i)=>({name,data:a.days.map((d,j)=>({x:Date.parse(d+'T12:00:00Z'),y:a.series[i][j]}))}));
- const limits=D.integerAxis(series.flatMap(s=>s.data.map(p=>p.y)),balance);
- return {...o,chart:{...o.chart,type:mode,height},series,colors:balance?[D.colors.green]:colors,
- xaxis:{type:'datetime',labels:{datetimeUTC:true,formatter:(v,t)=>shortDate(new Date(t).toISOString().slice(0,10))},axisBorder:{show:false},axisTicks:{show:false},tooltip:{enabled:false}},
- yaxis:{...limits,forceNiceScale:false,labels:{formatter:v=>fmt(Math.round(v))}},
- fill:mode==='area'?{type:'gradient',gradient:{opacityFrom:.26,opacityTo:.02}}:{type:'solid',opacity:.9},
- plotOptions:{bar:{columnWidth:'48%',borderRadius:2,colors:{ranges:balance?[{from:-1e15,to:-.000001,color:D.colors.red},{from:0,to:1e15,color:D.colors.green}]:[]}}},markers:{size:a.days.length===1?4:0},
- annotations:{yaxis:balance?[{y:0,borderColor:'#9ba8aa',strokeDashArray:0}]:[],xaxis:single?[{x:t-432e5,x2:t+432e5,fillColor:D.colors.gold,opacity:.10,label:{offsetX:from>=a.days.at(-3)?-65:from<=a.days[2]?65:0,text:'Обрана доба · '+shortDate(from),style:{background:'#c2bd51',color:'#111315'},orientation:'horizontal'}},{x:t,borderColor:D.colors.gold,strokeDashArray:4}]:[]},
- tooltip:{theme:'dark',x:{formatter:t=>fullDate(new Date(t).toISOString().slice(0,10))},y:{formatter:v=>fmt(v)}}};
+ return H.temporalOptions({dataApi:D,aggregate:a,labels,colors,height,balance,mode,from,to,fmt,shortDate,fullDate,reducedMotion:matchMedia('(prefers-reduced-motion: reduce)').matches});
 }
 function plotData(group){const r=D.contextRange(data.sheets[section.sheet].dates,from,to);return D.aggregate(data,section,category,r.from,r.to,group)}
 function trackChart(el,options){const epoch=generation,c=new ApexCharts(el,options);charts.push(c);return c.render().catch(error=>{if(epoch===generation)chartError(el,error);throw error})}
