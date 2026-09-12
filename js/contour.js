@@ -23,10 +23,9 @@ function selectCategory(id){
  if(wasOpen)$('#navigation-dialog').close();render();followCategory();window.scrollTo({top:0,behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'});dockScroll();
 }
 function navigation(){
-$('#sections').innerHTML=sections.map(s=>`<button class="section-button ${s.id===section.id?'active':''}" data-section="${s.id}" aria-current="${s.id===section.id?'page':'false'}">${icon(s.icon)}<span>${esc(s.name)}</span></button>`).join('');
 $('#sheet-sections').innerHTML=sections.map(s=>`<button data-section="${s.id}" class="${s.id===section.id?'active':''}" aria-pressed="${s.id===section.id}">${esc(s.short)}</button>`).join('');
 const cats=section.categories.map((c,i)=>`<button class="category-button ${c.id===category.id?'active':''}" data-category="${c.id}" aria-pressed="${c.id===category.id}"><span class="cat-index">${String(i+1).padStart(2,'0')}</span><span>${esc(c.name)}</span>${c.id===category.id?'<span class="cat-arrow">↗</span>':''}</button>`).join('');
-$('#inline-sections').innerHTML=sections.map(s=>`<button data-section="${s.id}" aria-pressed="${s.id===section.id}">${icon(s.icon)}${esc(s.short)}</button>`).join('');$('#categories').innerHTML=cats;$('#sheet-categories').innerHTML=cats;$('#category-count').textContent=String(section.categories.length).padStart(2,'0');
+$('#inline-sections').innerHTML=sections.map(s=>`<button data-section="${s.id}" aria-pressed="${s.id===section.id}">${icon(s.icon)}${esc(s.short)}</button>`).join('');$('#sheet-categories').innerHTML=cats;
 $$('[data-section]').forEach(b=>b.onclick=()=>selectSection(b.dataset.section));$$('[data-category]').forEach(b=>b.onclick=()=>selectCategory(b.dataset.category));
 }
 function spark(values,color){const finite=values.filter(v=>v!==null);if(!finite.length)return '<div class="spark"></div>';const lo=Math.min(...finite),hi=Math.max(...finite),pad=(hi-lo)*.15||Math.max(Math.abs(hi)*.05,1),min=lo-pad,max=hi+pad,h=27,w=180;let path='',gap=true;values.forEach((v,i)=>{if(v===null){gap=true;return}const x=i*w/Math.max(values.length-1,1),y=h-(v-min)/(max-min)*h+4;path+=`${gap?'M':'L'}${x.toFixed(1)},${y.toFixed(1)} `;gap=false});return `<svg class="spark" aria-hidden="true" viewBox="0 0 180 36" preserveAspectRatio="none"><path d="M0 34H180" stroke="${color}" opacity=".12"/><path d="${path}" fill="none" stroke="${color}" stroke-width="1.8" vector-effect="non-scaling-stroke"/>${from===to?`<line x1="${sparkX(values.length)}" x2="${sparkX(values.length)}" y1="0" y2="36" stroke="#c2bd51" stroke-dasharray="3 3"/>`:''}</svg>`}
@@ -79,7 +78,7 @@ return current.days.map((date,j)=>({name:fullDate(date),date,values:current.seri
 }
 function distribution(){
 if(category.id==='drones'&&category.droneType==='other')return droneBreakdown().filter(r=>r.id!=='fpv').map(r=>({name:r.name,value:r.value,color:r.color}));
-if(section.id==='personnel')return current.days.map((d,i)=>({name:shortDate(d),value:current.series[0][i],color:palette[i%palette.length]})).filter(r=>r.value!==null);
+if(section.id==='personnel')return current.days.map((d,i)=>({name:shortDate(d),value:current.series[0][i],color:palette[i%palette.length]}));
 if(section.id==='compare')return category.labels.map((name,i)=>({name,value:current.totals[i],color:category.colors[i]}));
 if(section.id==='ovgp')return groupNames.map((name,i)=>({name:groupLabel(name),value:D.sum(current.rows.map(r=>r.groups[name]?.[0]??null)),color:palette[i%palette.length]}));
 return tableRows.filter(r=>r.summary).map((r,i)=>({name:groupLabel(r.name),value:r.values[distributionIndex],color:palette[i%palette.length]}));
@@ -103,7 +102,7 @@ let notice='';if(!current.present)notice='За обраний період не�
 $('#chart-subtitle').textContent=fullDate(from)+' — '+fullDate(to)+' · '+category.unit;$('#chart-foot').innerHTML=category.labels.map((l,i)=>`<span><span style="color:${category.colors[i]}">●</span> ${esc(l)} <b>${fmt(current.totals[i])}</b></span>`).join('');renderTable();focus();renderDroneTypes();
 $('#distribution-controls').innerHTML=splitCategory(category)?category.labels.map((label,i)=>`<button data-distribution="${i}" aria-pressed="${distributionIndex===i}" style="--series-color:${category.colors[i]}">${esc(label)}</button>`).join(''):'';
 $$('[data-distribution]').forEach(b=>b.onclick=()=>{distributionIndex=Number(b.dataset.distribution);render();$('[data-distribution="'+distributionIndex+'"]').focus({preventScroll:true})});
-$('#trend-chart').innerHTML='';$('#distribution-chart').innerHTML='';const tasks=[];
+$('#trend-chart').innerHTML='';const tasks=[];
 const plot=plotData(),balance=category.id==='territory'&&graphMode==='balance';
 $('.trend-panel h3').textContent='Динаміка за період';
 $('#chart-subtitle').textContent=fullDate(plot.days[0])+' — '+fullDate(plot.days.at(-1))+' · '+category.unit+' · Автомасштаб'+(!balance?' (вісь не обов’язково від 0)':'')+(from===to?' · контекст '+plot.days.length+' днів; обрану добу виділено':'');
@@ -112,9 +111,9 @@ tabs.hidden=category.id!=='territory';tabs.innerHTML=['dynamics','balance'].map(
 $$('[data-graph]').forEach(b=>b.onclick=()=>{graphMode=b.dataset.graph;render()});$('.trend-panel .segmented').hidden=false;$$('[data-chart]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.chart===chartType)));
 if(plot.present)tasks.push(trackChart($('#trend-chart'),temporalOptions(plot,category.labels,category.colors,260,balance)));else empty($('#trend-chart'));
 if(category.id==='territory')$('#chart-foot').insertAdjacentHTML('beforeend',`<span class="balance-total">Баланс <b>${signed(current.totals.every(v=>v!==null)?current.totals[0]-current.totals[1]:null)}</b> · відновлено − втрачено</span>`);
-const dist=distribution().filter(r=>r.value!==null&&r.value>=0).sort((a,b)=>b.value-a.value),total=D.sum(dist.map(r=>r.value)),max=Math.max(...dist.map(r=>r.value),1);
+const distributionRows=distribution(),hasMissingDistribution=distributionRows.some(r=>r.value===null),dist=distributionRows.filter(r=>r.value!==null&&r.value>=0).sort((a,b)=>b.value-a.value),total=D.sum(dist.map(r=>r.value)),max=Math.max(...dist.map(r=>r.value),1);
 $('#distribution-subtitle').textContent=section.id==='compare'?'СОУ та противник':section.id==='personnel'?'Розподіл за днями':category.id==='drones'&&category.droneType==='other'?'Інші БпС · без FPV':category.labels[distributionIndex]+' · за угрупованнями';
-$('#distribution-legend').innerHTML=dist.length?dist.map(r=>`<div class="distribution-item"><div><span>${esc(r.name)}</span><strong>${fmt(r.value)}</strong><small>${total?fmt(r.value/total*100)+'%':'0%'}</small></div><div class="distribution-track"><i style="--bar:${r.color};width:${r.value/max*100}%"></i></div></div>`).join(''):'<p class="focus-note">Немає даних для розподілу</p>';
+$('#distribution-legend').innerHTML=(dist.length?dist.map(r=>`<div class="distribution-item"><div><span>${esc(r.name)}</span><strong>${fmt(r.value)}</strong><small>${total?fmt(r.value/total*100)+'%':'0%'}</small></div><div class="distribution-track"><i style="--bar:${r.color};width:${r.value/max*100}%"></i></div></div>`).join(''):'<p class="focus-note">Немає даних для розподілу</p>')+(hasMissingDistribution?'<p class="focus-note">Частки розраховано лише за наявними числовими значеннями; пропуски не прирівнюються до нуля.</p>':'');
 if(section.id==='personnel'&&current.rows.length){const latest=[...current.rows].sort((a,b)=>a.date.localeCompare(b.date)).at(-1),key=category.fields[0].replace('_доба','');$('#focus-content').insertAdjacentHTML('beforeend',`<div class="focus-rule"></div><div class="focus-label">Станом на ${fullDate(latest.date)}</div><div class="context-row"><span>З початку року</span><strong>${fmt(D.number(latest[key+'_рік']))}</strong></div><div class="context-row"><span>Накопичений підсумок</span><strong>${fmt(D.number(latest[key+'_всього']))}</strong></div>`)}
 await Promise.allSettled(tasks);if(epoch!==generation)return;dockScroll();
 }
