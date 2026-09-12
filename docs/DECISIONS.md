@@ -100,6 +100,13 @@
 - **Причина:** зробити неявні припущення про книгу, джерело, дати та chart lifecycle явними й тестованими до подальшої декомпозиції/оптимізації.
 - **Наслідки:** зміна Excel-полів/спеціальних рядків/лімітів починається з schema/config і regression tests; UI не має дублювати ці magic strings. Filename `Накопичення.xlsx` сам по собі не означає bundled/test data.
 
+### D24 — Cacheable parsed model і консервативна декомпозиція
+
+- **Дата:** 2026-09-12.
+- **Рішення:** тільки модель, створена `parse()`, отримує runtime indexes і LRU-кеш `aggregate()`. Ключ cache включає section/sheet, category id/type/fields, from/to і group; новий parse/import ізолює cache через новий data-object. Safety cap може обрізати calendar series, але не `raw/rows/totals` повного запитаного діапазону. Декомпозиція UI виконується через pure `contour-view.js` і `contour-charts.js`; runtime state/events/DOM lifecycle залишаються в `contour.js`. Legacy hidden sidebar і старий donut host не зберігаються як «про запас» після перевірки залежностей.
+- **Причина:** зменшити повторну роботу й blast radius майбутніх змін без framework rewrite та без зміни аналітичної математики/UX contract.
+- **Наслідки:** performance optimization не має змінювати результати; cache/index behavior покривається regression tests. Подальше дроблення `contour.js` виправдане лише конкретною відповідальністю, а не розміром файла. Частковий distribution з `null` пояснюється користувачу; null не стає нулем.
+
 ## Superseded — короткий індекс
 
 | ID | Колишня ідея | Чим замінено |

@@ -3,6 +3,8 @@ const fs=require('node:fs');
 const X=require('../js/xlsx.full.min.js');
 const C=require('../js/contour-config.js');
 const D=require('../js/contour-data.js');
+const V=require('../js/contour-view.js');
+const H=require('../js/contour-charts.js');
 const workbook=X.read(fs.readFileSync('Накопичення.xlsx'),{cellDates:true});
 const inspection=D.validateWorkbook(workbook,X);
 assert.equal(inspection.valid,true);
@@ -40,6 +42,50 @@ assert.deepEqual(typeTotals,[663,698,740,812,602,681,908]);
 assert.equal(D.sum(typeTotals),D.aggregate(data,ops,allDrones,'2026-09-01','2026-09-07').totals[0]);
 for(const day of data.sheets[C.WORKBOOK_SCHEMA.sheets.ops].dates){const t=D.droneTypes.map(type=>D.aggregate(data,ops,{...allDrones,fields:[type.field]},day,day).totals[0]);assert.equal(D.sum(t),D.aggregate(data,ops,allDrones,day,day).totals[0]);}
 console.log(JSON.stringify({status:'PASS',checks:'all categories: daily totals, missing periods, zero values, Excel error detection',quality:data.quality,validation:data.validation,ovFirst:ovResult.totals},null,2));
+
+// Parsed models use lazy sheet indexes and an LRU aggregate cache. A new parse gets an isolated cache.
+D.clearPerformanceCaches(data);
+assert.deepEqual(D.performanceStats(data),{cacheable:true,indexedSheets:0,aggregateEntries:0,indexBuilds:0,aggregateHits:0,aggregateMisses:0});
+const cachedFirst=D.aggregate(data,ops,ops.categories[0],'2026-09-03','2026-09-05');
+let perf=D.performanceStats(data);
+assert.equal(perf.indexedSheets,1);assert.equal(perf.indexBuilds,1);assert.equal(perf.aggregateMisses,1);assert.equal(perf.aggregateHits,0);assert.equal(perf.aggregateEntries,1);
+const cachedSecond=D.aggregate(data,ops,ops.categories[0],'2026-09-03','2026-09-05');
+perf=D.performanceStats(data);
+assert.strictEqual(cachedSecond,cachedFirst);assert.equal(perf.aggregateMisses,1);assert.equal(perf.aggregateHits,1);assert.equal(perf.indexBuilds,1);
+const freshData=D.parse(workbook,X);
+assert.equal(D.performanceStats(freshData).aggregateEntries,0);
+assert.equal(D.performanceStats(freshData).indexedSheets,0);
+assert.equal(D.performanceStats(synthetic).cacheable,false);
+console.log('PASS: parsed aggregate cache, lazy sheet indexes and import isolation');
+
+// Series safety cap must not change full-range totals/raw semantics.
+const longRows=[
+  {date:'2000-01-01',group:C.WORKBOOK_SCHEMA.rows.opsSummary,'Обстріли':1},
+  {date:'2020-01-01',group:C.WORKBOOK_SCHEMA.rows.opsSummary,'Обстріли':2}
+];
+const longSynthetic={sheets:{[C.WORKBOOK_SCHEMA.sheets.ops]:{records:longRows,dates:longRows.map(r=>r.date)}}};
+const longResult=D.aggregate(longSynthetic,ops,ops.categories[0],'2000-01-01','2020-01-01');
+assert.equal(longResult.days.length,C.APP_CONFIG.datePolicy.maxAggregateDays);
+assert.equal(longResult.truncated,true);
+assert.equal(longResult.raw.length,2);
+assert.equal(longResult.rows.length,2);
+assert.equal(longResult.totals[0],3);
+console.log('PASS: aggregate safety cap preserves full-range totals');
+
+// Pure Stage 3 helpers remain side-effect-free and preserve presentation contracts.
+assert.equal(V.esc('<"&>'),'&lt;&quot;&amp;&gt;');
+assert.equal(V.fmt(null),'—');
+assert.equal(V.fullDate('2026-09-07'),'07.09.2026');
+assert(V.icon('trend').includes('<svg'));
+assert.equal(H.modeLabel('area'),'Лінійний графік');
+const miniWithoutMarker=H.miniBar({dataApi:D,values:[1,2],color:'#fff',days:['2026-09-01','2026-09-02'],selectedDay:null,fmt:V.fmt,fullDate:V.fullDate});
+const miniWithMarker=H.miniBar({dataApi:D,values:[1,2],color:'#fff',days:['2026-09-01','2026-09-02'],selectedDay:'2026-09-01',fmt:V.fmt,fullDate:V.fullDate});
+assert(!miniWithoutMarker.includes('stroke-dasharray="3 3"'));
+assert(miniWithMarker.includes('stroke-dasharray="3 3"'));
+const chartOptions=H.temporalOptions({dataApi:D,aggregate:{days:['2026-09-01'],series:[[5]]},labels:['Тест'],colors:['#fff'],from:'2026-09-01',to:'2026-09-01',fmt:V.fmt,shortDate:V.shortDate,fullDate:V.fullDate,reducedMotion:true});
+assert.equal(chartOptions.chart.animations.enabled,false);
+assert.equal(chartOptions.series[0].data[0].y,5);
+console.log('PASS: extracted view/chart helpers');
 
 // Workbook contract: bad structures fail before parsing; missing optional metrics warn.
 const badBook=X.utils.book_new();

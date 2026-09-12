@@ -46,14 +46,18 @@ python -m http.server 8080 --bind 127.0.0.1
 
 Runtime складається з:
 
-- `index.html` — DOM та підключення ресурсів;
-- `js/contour-config.js` — `APP_CONFIG`, `WORKBOOK_SCHEMA`, назви угруповань і типи джерел;
-- `js/contour-data.js` — validation, parse/normalization, агрегація й date helpers;
-- `js/contour.js` — стан, UI, імпорт, графіки, таблиці, діалоги та CSV;
+- `index.html` — чинний DOM та підключення ресурсів;
+- `js/contour-config.js` — Excel/runtime/date/performance config;
+- `js/contour-data.js` — validation, parse/normalization, lazy indexes, aggregate cache, агрегація й date helpers;
+- `js/contour-view.js` — pure formatting/escaping/icon helpers;
+- `js/contour-charts.js` — pure chart option/SVG builders;
+- `js/contour.js` — state, DOM orchestration, import/export, navigation, dialogs і chart lifecycle;
 - `js/xlsx.full.min.js`, `js/apexcharts.js` — локальні сторонні бібліотеки;
 - три `contour*.css`, `fonts/`, `img/` і `Накопичення.xlsx`.
 
-Перед `parse()` книга проходить структурну перевірку. Критична несумісність блокує імпорт із конкретним повідомленням; некритичні відсутні поля стають warnings і відображаються в «Про джерело». Тип джерела (`bundled` / `user`) зберігається окремо від filename.
+Перед `parse()` книга проходить структурну перевірку. Parsed-модель використовує lazy indexes і bounded LRU aggregate cache; новий імпорт отримує ізольований cache. Це оптимізація повторних обчислень, а не зміна аналітичної математики.
+
+Legacy hidden sidebar і старий donut-host вилучені з runtime DOM. Desktop/tablet мають видимий доступ до «Джерело» в шапці, mobile — через нижню навігацію. Якщо у структурі частина значень відсутня, UI явно пояснює, що `null` не прирівнюється до нуля.
 
 ## Важливо
 

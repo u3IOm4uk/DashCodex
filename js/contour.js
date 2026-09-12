@@ -1,12 +1,7 @@
 (async function(){
 'use strict';
-const D=ContourData,C=ContourConfig,$=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
-const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const fmt=v=>v===null||v===undefined?'—':new Intl.NumberFormat('uk-UA',{maximumFractionDigits:2}).format(v);
-const shortDate=d=>d?d.slice(8)+'.'+d.slice(5,7):'—';
-const fullDate=d=>d?shortDate(d)+'.'+d.slice(0,4):'—';
-const paths={grid:'M3 3h7v7H3z M14 3h7v7h-7z M3 14h7v7H3z M14 14h7v7h-7z',layers:'m12 3 10 5-10 5L2 8z M2 12l10 5 10-5 M2 16l10 5 10-5',activity:'M2 12h4l3-8 6 16 3-8h4',upload:'M12 16V3 m-5 5 5-5 5 5 M4 15v6h16v-6',download:'M12 3v13 m-5-5 5 5 5-5 M4 16v5h16v-5',calendar:'M4 5h16v16H4z M8 3v4 M16 3v4 M4 10h16',database:'M4 6c0-4 16-4 16 0s-16 4-16 0 M4 6v12c0 4 16 4 16 0V6 M4 12c0 4 16 4 16 0',sliders:'M3 6h18 M3 12h18 M3 18h18 M8 3v6 M16 9v6 M10 15v6',trend:'M3 17l6-6 4 3 8-10 M15 4h6v6',bars:'M4 20V12h3v8 M11 20V4h3v16 M18 20V8h3v12',donut:'M12 3v9h9 M9 3.5a9 9 0 1 0 11.5 11.5 M15 3.5a9 9 0 0 1 5.5 5.5'};
-const icon=n=>`<svg class="icon" aria-hidden="true" viewBox="0 0 24 24"><path d="${paths[n]||paths.grid}"/></svg>`;
+const D=ContourData,C=ContourConfig,V=ContourView,H=ContourCharts,$=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
+const {esc,fmt,shortDate,fullDate,icon}=V;
 $$('[data-icon]').forEach(el=>el.innerHTML=icon(el.dataset.icon));
 let data,sections,section,category,from,to,chartType='area',charts=[],current,tableRows=[],source=C.source(C.APP_CONFIG.sourceKinds.BUNDLED,C.APP_CONFIG.defaultWorkbook),generation=0;
 let distributionIndex=0,graphMode='dynamics',detailChart=null,detailObserver=null;
@@ -28,10 +23,9 @@ function selectCategory(id){
  if(wasOpen)$('#navigation-dialog').close();render();followCategory();window.scrollTo({top:0,behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'});dockScroll();
 }
 function navigation(){
-$('#sections').innerHTML=sections.map(s=>`<button class="section-button ${s.id===section.id?'active':''}" data-section="${s.id}" aria-current="${s.id===section.id?'page':'false'}">${icon(s.icon)}<span>${esc(s.name)}</span></button>`).join('');
 $('#sheet-sections').innerHTML=sections.map(s=>`<button data-section="${s.id}" class="${s.id===section.id?'active':''}" aria-pressed="${s.id===section.id}">${esc(s.short)}</button>`).join('');
 const cats=section.categories.map((c,i)=>`<button class="category-button ${c.id===category.id?'active':''}" data-category="${c.id}" aria-pressed="${c.id===category.id}"><span class="cat-index">${String(i+1).padStart(2,'0')}</span><span>${esc(c.name)}</span>${c.id===category.id?'<span class="cat-arrow">↗</span>':''}</button>`).join('');
-$('#inline-sections').innerHTML=sections.map(s=>`<button data-section="${s.id}" aria-pressed="${s.id===section.id}">${icon(s.icon)}${esc(s.short)}</button>`).join('');$('#categories').innerHTML=cats;$('#sheet-categories').innerHTML=cats;$('#category-count').textContent=String(section.categories.length).padStart(2,'0');
+$('#inline-sections').innerHTML=sections.map(s=>`<button data-section="${s.id}" aria-pressed="${s.id===section.id}">${icon(s.icon)}${esc(s.short)}</button>`).join('');$('#sheet-categories').innerHTML=cats;
 $$('[data-section]').forEach(b=>b.onclick=()=>selectSection(b.dataset.section));$$('[data-category]').forEach(b=>b.onclick=()=>selectCategory(b.dataset.category));
 }
 function spark(values,color){const finite=values.filter(v=>v!==null);if(!finite.length)return '<div class="spark"></div>';const lo=Math.min(...finite),hi=Math.max(...finite),pad=(hi-lo)*.15||Math.max(Math.abs(hi)*.05,1),min=lo-pad,max=hi+pad,h=27,w=180;let path='',gap=true;values.forEach((v,i)=>{if(v===null){gap=true;return}const x=i*w/Math.max(values.length-1,1),y=h-(v-min)/(max-min)*h+4;path+=`${gap?'M':'L'}${x.toFixed(1)},${y.toFixed(1)} `;gap=false});return `<svg class="spark" aria-hidden="true" viewBox="0 0 180 36" preserveAspectRatio="none"><path d="M0 34H180" stroke="${color}" opacity=".12"/><path d="${path}" fill="none" stroke="${color}" stroke-width="1.8" vector-effect="non-scaling-stroke"/>${from===to?`<line x1="${sparkX(values.length)}" x2="${sparkX(values.length)}" y1="0" y2="36" stroke="#c2bd51" stroke-dasharray="3 3"/>`:''}</svg>`}
@@ -56,10 +50,9 @@ function droneCategory(type){const base=section.categories.find(c=>c.id==='drone
 function droneBreakdown(){return D.droneTypes.map(type=>({...type,value:D.aggregate(data,section,droneCategory(type),from,to).totals[0]}))}
 function miniChart(values,color,mode,days){
  if(mode==='area')return spark(values,color);
- const limits=D.axisRange(values),width=220,height=48,y=v=>height-(v-limits.min)/(limits.max-limits.min)*height+4,zero=y(Math.max(limits.min,0)),step=width/Math.max(values.length,1);
- return `<svg viewBox="0 0 220 58" preserveAspectRatio="none" role="img" aria-label="Динаміка стовпчиками"><line x1="0" x2="220" y1="${zero}" y2="${zero}" stroke="#65716c" opacity=".4"/>${values.map((v,i)=>v===null?'':`<rect x="${i*step+step*.15}" y="${Math.min(y(v),zero)}" width="${Math.max(1,step*.7)}" height="${Math.max(1,Math.abs(y(v)-zero))}" rx="1" fill="${color}"><title>${fullDate(days[i])}: ${fmt(v)}</title></rect>`).join('')}${from===to?`<line x1="${(days.indexOf(from)+.5)*step}" x2="${(days.indexOf(from)+.5)*step}" y1="0" y2="58" stroke="#c2bd51" stroke-dasharray="3 3"/>`:''}</svg>`;
+ return H.miniBar({dataApi:D,values,color,days,selectedDay:from===to?from:null,fmt,fullDate});
 }
-const modeLabel=m=>({area:'Лінійний графік',bar:'Стовпчиковий графік'}[m]);
+const modeLabel=H.modeLabel;
 function renderDroneTypes(){
  const panel=$('#drone-types'),previousScroll=panel.querySelector('.drone-type-grid')?.scrollLeft||0;
  panel.hidden=category.id!=='drones';$('#drone-anchor').hidden=panel.hidden;if(panel.hidden){panel.innerHTML='';panel.classList.remove('drone-compact');return}
@@ -73,18 +66,8 @@ function renderDroneTypes(){
  $$('[data-mini]').forEach(b=>b.onclick=()=>{const id=b.dataset.mini,mode=b.dataset.mode,item=cache.get(id),card=b.closest('.drone-type');droneModes[id]=mode;card.querySelector('.drone-mini').innerHTML=miniChart(item.raw,item.r.color,mode,item.days);card.querySelectorAll('[data-mini]').forEach(x=>x.setAttribute('aria-pressed',x===b));});
  $('#drone-overview').onclick=()=>{category=droneCategory({id:'other'});distributionIndex=0;render()};
 }
-function chartOptions(){return {chart:{fontFamily:'Exo,Arial,sans-serif',foreColor:'#8e9a9f',background:'transparent',toolbar:{show:false},animations:{enabled:!matchMedia('(prefers-reduced-motion: reduce)').matches,speed:450},parentHeightOffset:0},theme:{mode:'dark'},grid:{borderColor:'#343b3e',strokeDashArray:3,padding:{left:8,right:17}},tooltip:{theme:'dark'},dataLabels:{enabled:false},legend:{fontSize:'11px',position:'top',horizontalAlign:'left',markers:{size:4},itemMargin:{horizontal:9,vertical:4}},stroke:{width:2.2,curve:'straight'},noData:{text:'Немає даних'},states:{hover:{filter:{type:'lighten',value:.12}}}}}
 function temporalOptions(a,labels,colors,height=260,balance=false,mode=chartType){
- const o=chartOptions(),single=from===to,t=Date.parse(from+'T12:00:00Z');
- let series=balance?[{name:'Відновлено − втрачено',data:a.days.map((d,j)=>({x:Date.parse(d+'T12:00:00Z'),y:a.series.every(s=>s[j]!==null)?a.series[0][j]-a.series[1][j]:null}))}]:labels.map((name,i)=>({name,data:a.days.map((d,j)=>({x:Date.parse(d+'T12:00:00Z'),y:a.series[i][j]}))}));
- const limits=D.integerAxis(series.flatMap(s=>s.data.map(p=>p.y)),balance);
- return {...o,chart:{...o.chart,type:mode,height},series,colors:balance?[D.colors.green]:colors,
- xaxis:{type:'datetime',labels:{datetimeUTC:true,formatter:(v,t)=>shortDate(new Date(t).toISOString().slice(0,10))},axisBorder:{show:false},axisTicks:{show:false},tooltip:{enabled:false}},
- yaxis:{...limits,forceNiceScale:false,labels:{formatter:v=>fmt(Math.round(v))}},
- fill:mode==='area'?{type:'gradient',gradient:{opacityFrom:.26,opacityTo:.02}}:{type:'solid',opacity:.9},
- plotOptions:{bar:{columnWidth:'48%',borderRadius:2,colors:{ranges:balance?[{from:-1e15,to:-.000001,color:D.colors.red},{from:0,to:1e15,color:D.colors.green}]:[]}}},markers:{size:a.days.length===1?4:0},
- annotations:{yaxis:balance?[{y:0,borderColor:'#9ba8aa',strokeDashArray:0}]:[],xaxis:single?[{x:t-432e5,x2:t+432e5,fillColor:D.colors.gold,opacity:.10,label:{offsetX:from>=a.days.at(-3)?-65:from<=a.days[2]?65:0,text:'Обрана доба · '+shortDate(from),style:{background:'#c2bd51',color:'#111315'},orientation:'horizontal'}},{x:t,borderColor:D.colors.gold,strokeDashArray:4}]:[]},
- tooltip:{theme:'dark',x:{formatter:t=>fullDate(new Date(t).toISOString().slice(0,10))},y:{formatter:v=>fmt(v)}}};
+ return H.temporalOptions({dataApi:D,aggregate:a,labels,colors,height,balance,mode,from,to,fmt,shortDate,fullDate,reducedMotion:matchMedia('(prefers-reduced-motion: reduce)').matches});
 }
 function plotData(group){const r=D.contextRange(data.sheets[section.sheet].dates,from,to);return D.aggregate(data,section,category,r.from,r.to,group)}
 function trackChart(el,options){const epoch=generation,c=new ApexCharts(el,options);charts.push(c);return c.render().catch(error=>{if(epoch===generation)chartError(el,error);throw error})}
@@ -95,7 +78,7 @@ return current.days.map((date,j)=>({name:fullDate(date),date,values:current.seri
 }
 function distribution(){
 if(category.id==='drones'&&category.droneType==='other')return droneBreakdown().filter(r=>r.id!=='fpv').map(r=>({name:r.name,value:r.value,color:r.color}));
-if(section.id==='personnel')return current.days.map((d,i)=>({name:shortDate(d),value:current.series[0][i],color:palette[i%palette.length]})).filter(r=>r.value!==null);
+if(section.id==='personnel')return current.days.map((d,i)=>({name:shortDate(d),value:current.series[0][i],color:palette[i%palette.length]}));
 if(section.id==='compare')return category.labels.map((name,i)=>({name,value:current.totals[i],color:category.colors[i]}));
 if(section.id==='ovgp')return groupNames.map((name,i)=>({name:groupLabel(name),value:D.sum(current.rows.map(r=>r.groups[name]?.[0]??null)),color:palette[i%palette.length]}));
 return tableRows.filter(r=>r.summary).map((r,i)=>({name:groupLabel(r.name),value:r.values[distributionIndex],color:palette[i%palette.length]}));
@@ -119,7 +102,7 @@ let notice='';if(!current.present)notice='За обраний період не�
 $('#chart-subtitle').textContent=fullDate(from)+' — '+fullDate(to)+' · '+category.unit;$('#chart-foot').innerHTML=category.labels.map((l,i)=>`<span><span style="color:${category.colors[i]}">●</span> ${esc(l)} <b>${fmt(current.totals[i])}</b></span>`).join('');renderTable();focus();renderDroneTypes();
 $('#distribution-controls').innerHTML=splitCategory(category)?category.labels.map((label,i)=>`<button data-distribution="${i}" aria-pressed="${distributionIndex===i}" style="--series-color:${category.colors[i]}">${esc(label)}</button>`).join(''):'';
 $$('[data-distribution]').forEach(b=>b.onclick=()=>{distributionIndex=Number(b.dataset.distribution);render();$('[data-distribution="'+distributionIndex+'"]').focus({preventScroll:true})});
-$('#trend-chart').innerHTML='';$('#distribution-chart').innerHTML='';const tasks=[];
+$('#trend-chart').innerHTML='';const tasks=[];
 const plot=plotData(),balance=category.id==='territory'&&graphMode==='balance';
 $('.trend-panel h3').textContent='Динаміка за період';
 $('#chart-subtitle').textContent=fullDate(plot.days[0])+' — '+fullDate(plot.days.at(-1))+' · '+category.unit+' · Автомасштаб'+(!balance?' (вісь не обов’язково від 0)':'')+(from===to?' · контекст '+plot.days.length+' днів; обрану добу виділено':'');
@@ -128,9 +111,9 @@ tabs.hidden=category.id!=='territory';tabs.innerHTML=['dynamics','balance'].map(
 $$('[data-graph]').forEach(b=>b.onclick=()=>{graphMode=b.dataset.graph;render()});$('.trend-panel .segmented').hidden=false;$$('[data-chart]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.chart===chartType)));
 if(plot.present)tasks.push(trackChart($('#trend-chart'),temporalOptions(plot,category.labels,category.colors,260,balance)));else empty($('#trend-chart'));
 if(category.id==='territory')$('#chart-foot').insertAdjacentHTML('beforeend',`<span class="balance-total">Баланс <b>${signed(current.totals.every(v=>v!==null)?current.totals[0]-current.totals[1]:null)}</b> · відновлено − втрачено</span>`);
-const dist=distribution().filter(r=>r.value!==null&&r.value>=0).sort((a,b)=>b.value-a.value),total=D.sum(dist.map(r=>r.value)),max=Math.max(...dist.map(r=>r.value),1);
+const distributionRows=distribution(),hasMissingDistribution=distributionRows.some(r=>r.value===null),dist=distributionRows.filter(r=>r.value!==null&&r.value>=0).sort((a,b)=>b.value-a.value),total=D.sum(dist.map(r=>r.value)),max=Math.max(...dist.map(r=>r.value),1);
 $('#distribution-subtitle').textContent=section.id==='compare'?'СОУ та противник':section.id==='personnel'?'Розподіл за днями':category.id==='drones'&&category.droneType==='other'?'Інші БпС · без FPV':category.labels[distributionIndex]+' · за угрупованнями';
-$('#distribution-legend').innerHTML=dist.length?dist.map(r=>`<div class="distribution-item"><div><span>${esc(r.name)}</span><strong>${fmt(r.value)}</strong><small>${total?fmt(r.value/total*100)+'%':'0%'}</small></div><div class="distribution-track"><i style="--bar:${r.color};width:${r.value/max*100}%"></i></div></div>`).join(''):'<p class="focus-note">Немає даних для розподілу</p>';
+$('#distribution-legend').innerHTML=(dist.length?dist.map(r=>`<div class="distribution-item"><div><span>${esc(r.name)}</span><strong>${fmt(r.value)}</strong><small>${total?fmt(r.value/total*100)+'%':'0%'}</small></div><div class="distribution-track"><i style="--bar:${r.color};width:${r.value/max*100}%"></i></div></div>`).join(''):'<p class="focus-note">Немає даних для розподілу</p>')+(hasMissingDistribution?'<p class="focus-note">Частки розраховано лише за наявними числовими значеннями; пропуски не прирівнюються до нуля.</p>':'');
 if(section.id==='personnel'&&current.rows.length){const latest=[...current.rows].sort((a,b)=>a.date.localeCompare(b.date)).at(-1),key=category.fields[0].replace('_доба','');$('#focus-content').insertAdjacentHTML('beforeend',`<div class="focus-rule"></div><div class="focus-label">Станом на ${fullDate(latest.date)}</div><div class="context-row"><span>З початку року</span><strong>${fmt(D.number(latest[key+'_рік']))}</strong></div><div class="context-row"><span>Накопичений підсумок</span><strong>${fmt(D.number(latest[key+'_всього']))}</strong></div>`)}
 await Promise.allSettled(tasks);if(epoch!==generation)return;dockScroll();
 }
