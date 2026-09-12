@@ -1,0 +1,97 @@
+name: Change-scoped quality
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  scope:
+    runs-on: ubuntu-latest
+    outputs:
+      syntax: ${{ steps.scope.outputs.syntax }}
+      syntax_files: ${{ steps.scope.outputs.syntax_files }}
+      regression: ${{ steps.scope.outputs.regression }}
+      browser_core: ${{ steps.scope.outputs.browser_core }}
+      browser_sticky: ${{ steps.scope.outputs.browser_sticky }}
+      browser_bps: ${{ steps.scope.outputs.browser_bps }}
+      browser_charts: ${{ steps.scope.outputs.browser_charts }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: scope
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE="${{ github.event.pull_request.base.sha }}"
+            HEAD="${{ github.event.pull_request.head.sha }}"
+          else
+            BASE="${{ github.event.before }}"
+            HEAD="${{ github.sha }}"
+            if [ -z "$BASE" ] || printf '%s' "$BASE" | grep -Eq '^0+$'; then
+              BASE="$(git rev-parse HEAD^)"
+            fi
+          fi
+          node scripts/quality-scope.cjs --base "$BASE" --head "$HEAD"
+
+  syntax:
+    needs: scope
+    if: needs.scope.outputs.syntax == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Check changed JavaScript only
+        env:
+          FILES: ${{ needs.scope.outputs.syntax_files }}
+        shell: bash
+        run: |
+          while IFS= read -r file; do
+            [ -z "$file" ] && continue
+            echo "node --check $file"
+            node --check "$file"
+          done <<< "$FILES"
+
+  regression:
+    needs: scope
+    if: needs.scope.outputs.regression == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Data and aggregation regression
+        run: node .audit/verify-contour.cjs
+
+  browser:
+    needs: scope
+    if: needs.scope.outputs.browser_core == 'true' || needs.scope.outputs.browser_sticky == 'true' || needs.scope.outputs.browser_bps == 'true' || needs.scope.outputs.browser_charts == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package.json
+      - name: Install test tooling
+        run: npm install --no-audit --no-fund
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Run only browser tests relevant to this diff
+        shell: bash
+        run: |
+          files=()
+          [ "${{ needs.scope.outputs.browser_core }}" = "true" ] && files+=(tests/browser/core.spec.cjs)
+          [ "${{ needs.scope.outputs.browser_sticky }}" = "true" ] && files+=(tests/browser/sticky.spec.cjs)
+          [ "${{ needs.scope.outputs.browser_bps }}" = "true" ] && files+=(tests/browser/bps.spec.cjs)
+          [ "${{ needs.scope.outputs.browser_charts }}" = "true" ] && files+=(tests/browser/charts.spec.cjs)
+          printf 'Selected browser tests: %s\n' "${files[*]}"
+          npx playwright test "${files[@]}"
