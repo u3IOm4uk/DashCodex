@@ -66,7 +66,7 @@ function saveStatuses(storage,statuses){
 
 let data=null,catalog={nodes:[],index:Object.create(null),roots:[],ambiguous:[]},statuses={},showArchived=false;
 const expanded=new Set();
-let bypassDetail=null,refreshQueued=false,observer=null;
+let refreshQueued=false,observer=null;
 const storage=typeof localStorage!=='undefined'?localStorage:null;
 statuses=loadStatuses(storage);
 
@@ -113,12 +113,15 @@ function decorateRow(row,node){
   if(row.dataset.unitEnhanced==='1')return;
   row.dataset.unitEnhanced='1';row.dataset.unitName=node.name;row.dataset.unitLevel=node.level;if(node.parent)row.dataset.unitParent=node.parent;
   row.classList.add('unit-row',`unit-level-${node.level}`);if(node.ambiguous)row.classList.add('unit-ambiguous');
-  const cell=row.querySelector('td:first-child'),button=row.querySelector('.row-button'),name=button?.querySelector('.row-name');if(!cell||!button||!name)return;
+  const cell=row.querySelector('td:first-child'),button=row.querySelector('.row-button'),name=button?.querySelector('.row-name'),index=button?.querySelector('.row-index');if(!cell||!button||!name||!index)return;
+  const main=document.createElement('div');main.className='unit-row-main';main.append(index);
   if(node.children.length){
-    row.classList.add('unit-parent');button.setAttribute('aria-label',`Розгорнути: ${node.name}`);
-    const expand=document.createElement('button');expand.type='button';expand.className='unit-expand';expand.setAttribute('aria-label',`Розгорнути: ${node.name}`);expand.onclick=event=>{event.preventDefault();event.stopPropagation();toggle(node.name)};cell.insertBefore(expand,button);
-    const detail=document.createElement('button');detail.type='button';detail.className='unit-detail';detail.textContent='↗';detail.setAttribute('aria-label',`Відкрити деталі: ${node.name}`);detail.onclick=event=>{event.preventDefault();event.stopPropagation();bypassDetail=node.name;button.click();bypassDetail=null};cell.append(detail);
+    row.classList.add('unit-parent');
+    const expand=document.createElement('button');expand.type='button';expand.className='unit-expand';expand.setAttribute('aria-label',`Розгорнути: ${node.name}`);expand.onclick=event=>{event.preventDefault();event.stopPropagation();toggle(node.name)};main.append(expand);
+  }else{
+    const slot=document.createElement('span');slot.className='unit-expand-slot';slot.setAttribute('aria-hidden','true');main.append(slot);
   }
+  main.append(button);cell.append(main);
   if(node.ambiguous){const badge=document.createElement('span');badge.className='unit-badge';badge.textContent='склад ?';name.after(badge)}
 }
 function toggle(name){if(expanded.has(name))expanded.delete(name);else expanded.add(name);applyTableState()}
@@ -126,15 +129,11 @@ function applyTableState(){
   if(typeof document==='undefined')return;ensureControls();ensureDialog();const controls=document.querySelector('#unit-controls');if(controls)controls.hidden=!isOpsTable();if(!isOpsTable())return;
   const archiveToggle=document.querySelector('#unit-archive-toggle');if(archiveToggle){archiveToggle.setAttribute('aria-pressed',String(showArchived));const count=catalog.nodes.filter(n=>statusOf(n.name)===STATUS.ARCHIVED).length;archiveToggle.textContent=`Архів${count?' · '+count:''}`}
   const rows=[...document.querySelectorAll('#table-body tr')];
-  for(const row of rows){const name=clean(row.querySelector('.row-name')?.textContent),node=nodeOf(name);if(!node)continue;decorateRow(row,node);const status=statusOf(node.name);row.classList.toggle('unit-status-archived',status===STATUS.ARCHIVED);row.classList.toggle('unit-status-hidden',status===STATUS.HIDDEN);row.hidden=!visibleNode(node);const expand=row.querySelector('.unit-expand');if(expand){const open=expanded.has(node.name);expand.setAttribute('aria-expanded',String(open));expand.textContent=open?'−':'+';expand.setAttribute('aria-label',`${open?'Згорнути':'Розгорнути'}: ${node.name}`);const rowButton=row.querySelector('.row-button');if(rowButton)rowButton.setAttribute('aria-label',`${open?'Згорнути':'Розгорнути'}: ${node.name}`)}}
+  for(const row of rows){const name=clean(row.querySelector('.row-name')?.textContent),node=nodeOf(name);if(!node)continue;decorateRow(row,node);const status=statusOf(node.name);row.classList.toggle('unit-status-archived',status===STATUS.ARCHIVED);row.classList.toggle('unit-status-hidden',status===STATUS.HIDDEN);row.hidden=!visibleNode(node);const expand=row.querySelector('.unit-expand');if(expand){const open=expanded.has(node.name);expand.setAttribute('aria-expanded',String(open));expand.textContent=open?'−':'+';expand.setAttribute('aria-label',`${open?'Згорнути':'Розгорнути'}: ${node.name}`)}}
 }
 function requestRefresh(){if(typeof document==='undefined'||refreshQueued)return;refreshQueued=true;queueMicrotask(()=>{refreshQueued=false;applyTableState()})}
 function bootDom(){
   if(typeof document==='undefined')return;ensureControls();ensureDialog();const body=document.querySelector('#table-body');if(!body)return;
-  body.addEventListener('click',event=>{
-    const button=event.target.closest('.row-button');if(!button||!body.contains(button))return;const row=button.closest('tr'),node=nodeOf(row?.dataset.unitName||button.querySelector('.row-name')?.textContent);if(!node?.children.length||bypassDetail===node.name)return;
-    event.preventDefault();event.stopImmediatePropagation();toggle(node.name);
-  },true);
   observer=new MutationObserver(()=>requestRefresh());observer.observe(body,{childList:true});requestRefresh();
 }
 function wrapParser(){
