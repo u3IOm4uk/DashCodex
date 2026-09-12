@@ -51,6 +51,17 @@ assert.throws(()=>D.parse(badBook,X),err=>err.name==='WorkbookValidationError'&&
 const emptyInspection=D.validateWorkbook({SheetNames:[],Sheets:{}},X);
 assert.equal(emptyInspection.valid,false);
 assert(emptyInspection.errors.some(e=>e.code==='workbook-empty'));
+const warningBook=X.utils.book_new();
+X.utils.book_append_sheet(warningBook,X.utils.aoa_to_sheet([
+  ['Дата','Угруповання','Обстріли'],
+  [new Date('2026-09-01T00:00:00Z'),C.WORKBOOK_SCHEMA.rows.opsSummary,1]
+]),C.WORKBOOK_SCHEMA.sheets.ops);
+const warningInspection=D.validateWorkbook(warningBook,X);
+assert.equal(warningInspection.valid,true);
+assert.equal(warningInspection.errors.length,0);
+assert(warningInspection.warnings.some(w=>w.code==='ops-fields'));
+const warningData=D.parse(warningBook,X);
+assert(warningData.validation.warnings.some(w=>w.code==='ops-fields'));
 
 // Date policy is inclusive and centralized.
 assert.equal(D.inclusiveDays('2026-09-01','2026-09-01'),1);
