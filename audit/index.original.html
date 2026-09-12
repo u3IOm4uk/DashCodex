@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <title>DashBoard</title>
+    <link rel="stylesheet" type="text/css" href="css/bootstrap-5.3.8-dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" type="text/css" href="css/css.css" />
+</head>
+<body class="d-flex flex-column min-vh-100" data-page="DashBoard">
+
+    <div class="d-flex flex-column min-vh-100" id="container">
+
+        <!--base-tpl-->
+        <template id="base-tpl">
+            <div class="site container-fluid d-flex flex-column min-vh-100">
+                <header class="site-header container-fluid">
+                    <div class="row align-items-center">
+                        <div class="col-auto site-box-logo">
+                            <div class="logo row d-flex align-items-center">
+                                <div class="col-auto">
+                                    <img src="img/logo.png" alt="ГШ ЗСУ" class="logo-img" />
+                                </div>
+                                <div class="col flex-grow-1">
+                                    Генеральний штаб<br />Збройних Сил України
+                                </div>
+                                <input type="file" id="excel-file" accept=".xlsx, .xls, .xlsm" title="Завантажити файл" />
+                            </div>
+                        </div>
+                        <div class="col d-flex flex-grow-1 justify-content-center site-box-operations">
+
+                            <div class="date-range">
+                                <div>
+                                    <input type="date" id="start-date" name="start" data-bind-value="date.from" data-partner="end-date" data-dest="from">
+                                    <span>—</span>
+                                    <input type="date" id="end-date" name="end" data-bind-value="date.to" data-partner="start-date" data-dest="to">
+                                </div>
+                                <div class="filters">
+                                    <a class="btn-filter-date" data-period="month">місяць</a>
+                                    <a class="btn-filter-date" data-period="period">7 днів</a>
+                                    <a class="btn-filter-date" data-period="yesterday">вчора</a>
+                                    <a class="btn-filter-date" data-period="today">сьогодні</a>
+                                </div>
+                            </div>
+                            <h1 class="title" data-list="dates" data-bind-template="tplDate">
+
+                                <!--tpl: date-period-->
+                                <template id="date-period">
+                                    <span>
+                                        <!--data-bind-data-key="id"-->
+                                        <span data-field="showDates.from" class="from"></span>
+                                        -
+                                        <span data-field="showDates.to" class="to"></span>
+                                    </span>
+                                </template>
+                                <!--АБО-->
+                                <!--tpl: date-one-->
+                                <template id="date-one">
+                                    <span data-field="showDates.from"></span><!--data-bind-data-key="id"-->
+                                </template>
+                            </h1>
+                        </div>
+                        <div class="col-auto site-box-options">
+                            <!--<button class="btn btn-primary btn-header btn-graph" type="button" data-bs-toggle="offcanvas" data-bs-target="#offcanvasBottom" aria-controls="offcanvasBottom">
+                            </button>-->
+                            <div class="clock-card">
+                                <div class="time-container">
+                                    <span class="time-main" id="time-main">00:00</span>
+                                    <span class="seconds" id="seconds">00</span>
+                                </div>
+                                <div class="date-container" id="date">Завантаження...</div>
+                            </div>
+                            <div class="days-counter btn-share-state" title="Синхронізувати екран">
+                                <span data-field="warDay" class="days badge text-bg-warning"></span> день війни
+                            </div>
+                        </div>
+                    </div>
+                </header>
+                <div class="site-navigation">
+                    <nav id="carouselNav" class="navigation-slider">
+                        <button class="slider-btn prev" type="button" data-btn-type="prev" data-btn-carousel="carouselNav">‹</button>
+
+                        <div class="slider-track" data-list="carousel" data-bind-template="tpl">
+                            <div class="slider-item" data-page="DashBoard">
+                                <h2 class="title" data-btn-type="direct" data-btn-carousel="carouselNav">Оперативна обстановка</h2>
+                            </div>
+                            <!--<div class="slider-item" data-page="OVgP">
+                                <h2 class="title" data-btn-type="direct" data-btn-carousel="carouselNav">ОВгП</h2>
+                            </div>-->
+                            <!--<div class="slider-item" data-page="OVgP1">
+                                <h2 class="title" data-btn-type="direct" data-btn-carousel="carouselNav">Щось іще</h2>
+                            </div>-->
+                        </div>
+
+                        <button class="slider-btn next" type="button" data-btn-type="next" data-btn-carousel="carouselNav">›</button>
+                    </nav>
+                </div>
+                <main id="page-container" class="flex-grow-1 d-flex flex-column site-content container-fluid" data-list="pageContainer" data-bind-template="tpl">
+
+                    <!--tpl-page-container-->
+                    <template id="tpl-page-container">
+                        <div class="flex-grow-1 d-flex flex-column site-content container-fluid">
+                            <div class="container-fluid block-dynamic">
+                                <div class="row" data-list="categories" data-bind-template="tpl">
+
+                                    <!--tpl: block-dynamic-info-->
+                                    <template id="block-dynamic-info">
+                                        <div class="block-dynamic-info col-auto card text-center"
+                                             data-bind-data-opt="id"
+                                             data-bind-data-title="category_name"
+                                             data-bind-data-ind="ind"
+                                             data-bind-data-set="category_key"
+                                             data-bind-class="cssClass">
+                                            <!--data-bind-data-key="id"-->
+                                            <div class="card-header row align-items-center">
+                                                <div class="col d-flex flex-grow-1">
+                                                    <h3 class="title" data-field="category_name"></h3>
+                                                </div>
+                                                <div class="col-auto" data-list="btnDetaile"
+                                                     data-bind-template="tpl">
+
+                                                    <!--tpl: tpl-btn-detaile-->
+                                                    <!--<button type="button" class="btn-show btn btn-outline-secondary btn-sm btn-detail"
+                                                            data-bs-toggle="offcanvas"
+                                                            data-bs-target="#offcanvasTop"
+                                                            aria-controls="offcanvasTop"
+                                                            data-field="textDetail"></button>-->
+                                                </div>
+                                            </div>
+                                            <div class="card-body">
+                                                <div class="value">
+                                                    <span class="badge text-bg-warning" data-field="total_value" data-html></span>
+                                                </div>
+                                                <div class="chart-container">
+                                                    <div class="chart chart-dynamic" data-bind-data-chart="chartOptName"><!--Stacked Area--></div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </template>
+                                </div>
+                            </div>
+
+                            <div class="container-fluid flex-grow-1 block-detale">
+                                <div class="row block-detale-content" data-list="slideContent" data-bind-template="tpl">
+
+                                    <!--tpl: slide-content-->
+                                    <template id="slide-content">
+                                        <div id="carouselExample" class="carousel slide">
+                                            <!--data-bs-ride="carousel" data-bs-interval="3000" data-bs-pause="false"-->
+                                            <div class="carousel-inner"
+                                                 data-list="carousel"
+                                                 data-bind-template="tpl">
+
+                                                <!--tpl: carousel-inner-->
+                                                <template id="carousel-inner">
+                                                    <div class="carousel-item" data-bind-class="active">
+                                                        <h2 class="title block-detale-title" data-field="title"></h2>
+                                                        <div class="row row-content" data-list="units" data-bind-template="tpl">
+
+                                                            <!--tpl: block-detaile-info-->
+                                                            <template id="block-detaile-info">
+                                                                <div class="block-detaile-info card col"
+                                                                     data-bind-class="cssClass">
+                                                                    <!--data-bind-data-key="id"-->
+                                                                    <div class="card-header d-flex">
+
+                                                                        <div class="flex-shrink-0">
+                                                                            <h3 class="title mb-0" data-field="unitName"></h3>
+                                                                        </div>
+
+                                                                        <div class="flex-grow-1 d-flex align-items-center">
+                                                                            <div class="counter" data-field="value" data-html></div>
+                                                                            <!--<div class="chart">--><!--Stacked Bar--><!--</div>-->
+                                                                        </div>
+
+                                                                        <div class="flex-shrink-0"
+                                                                             data-list="btnDetaile"
+                                                                             data-bind-template="tpl">
+
+                                                                            <!--tpl: tpl-btn-detaile-->
+                                                                            <template id="tpl-btn-detaile">
+                                                                                <button class="btn-show btn btn-outline-secondary btn-sm btn-detail"
+                                                                                        data-bs-toggle="offcanvas" data-bs-target="#offcanvasTop"
+                                                                                        data-bind-data-model="modelDetail"
+                                                                                        data-field="textDetail">
+                                                                                </button>
+                                                                            </template>
+
+                                                                        </div>
+                                                                    </div>
+
+                                                                    <div class="card-body">
+                                                                        <div class="row align-items-center">
+                                                                            <div class="chart chart-detail" data-bind-data-chart="chartOptName"><!--Basic Bar--></div>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            </template>
+
+                                                            <!--tpl: block-detaile-info2-->
+                                                            <template id="block-detaile-info2">
+                                                                <div class="block-detaile-info block-detaile-info-2 card col"
+                                                                     data-bind-class="cssClass">
+                                                                    <!--data-bind-data-key="id"-->
+                                                                    <div class="card-header d-flex">
+
+                                                                        <div class="flex-shrink-0">
+                                                                            <h3 class="title mb-0" data-field="unitName"></h3>
+                                                                        </div>
+
+                                                                        <div class="flex-grow-1 d-flex align-items-center" data-bind-class="classCounter">
+                                                                            <div class="counter" data-field="value" data-html></div>
+                                                                        </div>
+
+                                                                        <div class="flex-shrink-0"
+                                                                             data-list="btnDetaile"
+                                                                             data-bind-template="tpl">
+
+                                                                            <!--tpl: tpl-btn-detaile-->
+                                                                        </div>
+                                                                    </div>
+
+                                                                    <div class="card-body">
+                                                                        <div class="row"
+                                                                             data-list="cardItemsTotal"
+                                                                             data-bind-template="tpl">
+
+                                                                            <!--tpl: tpl-text-card-block-->
+                                                                            <template id="tpl-text-card-block">
+                                                                                <div class="text-card-block">
+                                                                                    <h4 class="title" data-field="blockTitle"></h4>
+                                                                                    <div class="row align-items-center card-holder"
+                                                                                         data-list="cardItems"
+                                                                                         data-bind-template="tpl">
+
+                                                                                        <!--tpl: tpl-text-card-item-->
+                                                                                        <template id="tpl-text-card-item">
+                                                                                            <div class="text-card-item" data-bind-class="cssClass">
+                                                                                                <div class="title" data-field="textTitle"></div>
+                                                                                                <div class="area">
+                                                                                                    <span class="number" data-field="textNumber"></span>
+                                                                                                    <span class="measure" data-field="textMeasure" data-html></span>
+                                                                                                </div>
+                                                                                            </div>
+                                                                                        </template>
+
+                                                                                    </div>
+                                                                                </div>
+                                                                            </template>
+
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            </template>
+
+                                                        </div>
+                                                    </div>
+                                                </template>
+
+                                            </div>
+                                            <button class="carousel-control-prev" type="button" data-bs-target="#carouselExample" data-bs-slide="prev">
+                                                <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+                                                <span class="visually-hidden">Previous</span>
+                                            </button>
+                                            <button class="carousel-control-next" type="button" data-bs-target="#carouselExample" data-bs-slide="next">
+                                                <span class="carousel-control-next-icon" aria-hidden="true"></span>
+                                                <span class="visually-hidden">Next</span>
+                                            </button>
+                                        </div>
+                                    </template>
+                                </div>
+                            </div>
+
+                            <div class="container-fluid block-corelation">
+                                <h2 class="title">Співвідношення</h2>
+                                <div class="row" data-list="correlations" data-template="block-corelation-info">
+
+                                    <!--tpl: block-corelation-info-->
+                                    <template id="block-corelation-info">
+                                        <div class="col-auto card text-center block-corelation-info">
+                                            <!--data-bind-data-key="id"-->
+                                            <div class="card-header d-flex">
+
+                                                <div class="flex-shrink-0">
+                                                    <h3 class="title mb-0" data-field="title"></h3>
+                                                </div>
+
+                                                <div class="flex-grow-1 d-flex align-items-center counters">
+                                                    <div class="counter text-sou" data-field="souValue"></div>
+                                                    <div class="counter px-2" data-field="ratioText"></div>
+                                                    <div class="counter text-pidar" data-field="enemyValue"></div>
+                                                </div>
+
+                                                <div class="flex-shrink-0" data-list="btnDetaile"
+                                                     data-bind-template="tpl">
+
+                                                    <!--tpl: tpl-btn-detaile-->
+                                                    <!--<button class="btn-show btn btn-outline-secondary btn-sm btn-detail"
+                                                            data-bs-toggle="offcanvas" data-bs-target="#offcanvasTop" data-field="textDetail">
+                                                    </button>-->
+                                                </div>
+                                            </div>
+                                            <div class="card-body">
+                                                <!--<div class="value">1 : 2,4</div>-->
+                                                <div class="chart"><!--bar oposite--></div>
+                                            </div>
+                                        </div>
+                                    </template>
+                                </div>
+                            </div>
+                        </div>
+                    </template>
+                </main>
+            </div>
+        </template>
+    </div>
+
+
+    <div class="offcanvas offcanvas-top" tabindex="-1" id="offcanvasTop" aria-labelledby="offcanvasTopLabel">
+        <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="offcanvasTopLabel" data-field="offcanvasTitle">Деталізовані дані</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+        </div>
+        <div class="offcanvas-body descr-container" id="descr-container">
+            <!--<div class="loader l9-0"></div>-->
+            <!--<div class="table-responsive">
+                <table class="table table-striped table-sm text-center">
+                    <thead>
+                        <tr id="offcanvas-table-header">
+                        </tr>
+                    </thead>
+                    <tbody id="offcanvas-table-body" data-list="offcanvasRows" data-template="tpl-detail-list-item">
+                    </tbody>
+                </table>
+            </div>-->
+        </div>
+    </div>
+
+    <div class="offcanvas offcanvas-bottom" tabindex="-1" id="offcanvasBottom" aria-labelledby="offcanvasBottomLabel">
+        <!-- Шапка панелі (заголовок та кнопка закриття) -->
+        <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="offcanvasBottomLabel">Заголовок панелі</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+        </div>
+
+        <!-- Основний контент панелі -->
+        <div class="offcanvas-body">
+            <p>Тут розміщується будь-який ваш контент, формати чи кнопки дій.</p>
+        </div>
+    </div>
+
+    <template id="tpl-just-template">
+        <div data-list="content" data-bind-template="tpl" class="content"></div>
+    </template>
+
+    <!--plugins-->
+    <script type="text/javascript" src="js/xlsx.js"></script>
+    <script type="text/javascript" src="js/dexie.js"></script>
+    <script type="text/javascript" src="js/apexcharts.js"></script>
+    <script type="text/javascript" src="css/bootstrap-5.3.8-dist/js/bootstrap.min.js"></script>
+    <!--logic-->
+    <script type="text/javascript" src="js/store.js"></script>
+    <script type="text/javascript" src="js/data.js"></script>
+    <script type="text/javascript" src="js/model.js"></script>
+    <script type="text/javascript" src="js/view.js"></script>
+    <script type="text/javascript" src="js/controller.js"></script>
+    <!--basement-->
+    <script type="text/javascript" src="js/js.js"></script>
+    <!--<script type="text/javascript" src="js/test_js.js"></script>-->
+</body>
+</html> 
