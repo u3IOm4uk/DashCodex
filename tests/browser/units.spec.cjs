@@ -36,13 +36,19 @@ test('hierarchy inference keeps stable parents and rejects ambiguous ones',async
  expect(result.sharedAmbiguous).toBe(true);
 });
 
-test('unit hierarchy expands and archived rows keep historical details',async({page})=>{
+test('expand control is aligned before the name and the name opens details',async({page})=>{
  await openDashboard(page);
  const parent=page.locator('#table-body tr.unit-parent').first();
  await expect(parent).toBeVisible();
  const parentName=await parent.getAttribute('data-unit-name');
  expect(parentName).toBeTruthy();
- await parent.locator('.row-button').click();
+ await expect(parent.locator('.unit-detail')).toHaveCount(0);
+ const order=await parent.locator('.unit-row-main').locator(':scope > *').evaluateAll(nodes=>nodes.map(node=>node.className));
+ expect(order[0]).toContain('row-index');
+ expect(order[1]).toContain('unit-expand');
+ expect(order[2]).toContain('row-button');
+
+ await parent.locator('.unit-expand').click();
  await expect(parent.locator('.unit-expand')).toHaveAttribute('aria-expanded','true');
  const childIndex=await rowIndexBy(page,'unitParent',parentName,true);
  expect(childIndex).toBeGreaterThan(-1);
@@ -50,6 +56,11 @@ test('unit hierarchy expands and archived rows keep historical details',async({p
  await expect(child).toBeVisible();
  const childName=await child.getAttribute('data-unit-name');
  expect(childName).toBeTruthy();
+
+ await parent.locator('.row-button').click();
+ await expect(page.locator('#detail-dialog')).toBeVisible();
+ await expect(page.locator('#detail-name')).toHaveText(parentName);
+ await page.locator('#detail-dialog .close-dialog').click();
 
  await page.locator('#unit-manage').click();
  await expect(page.locator('#unit-manager-dialog')).toBeVisible();
