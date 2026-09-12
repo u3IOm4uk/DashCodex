@@ -12,17 +12,19 @@
 - Sticky-категорії зберігають compact/pinned стан при зміні категорії; переміщується контент під ними.
 - Change-scoped GitHub Actions є merge gate: syntax/regression/browser checks запускаються лише за релевантним diff.
 - Playwright scopes: `core`, `sticky`, `charts`, `bps`, `units`; resource revision перевіряється окремо.
-- `contour-units.js` будує ієрархію **угруповання → АК → підрозділ** зі стабільного порядку рядків ГОЧ; неоднозначні зв’язки не вигадуються.
 - Статуси `active / hidden / archived` зберігаються лише локально; архівування не змінює Excel або normalized records.
 - First-party resource revision у `main`: **31**.
 
 ## Поточна робоча зміна
 
-- Гілка: `fix/unit-hierarchy-row-actions`.
-- У таблиці ієрархії окрема кнопка `+ / −` відповідає тільки за розгортання/згортання й розміщується у вирівняному слоті ліворуч від назви.
-- Натискання назви угруповання/АК/підрозділу відкриває штатні деталі.
-- Окрема дія `↗` у рядках ієрархії прибирається.
-- Для цієї гілки first-party resource revision: **32**.
+- Гілка: `fix/unit-hierarchy-row-actions`, draft PR #6.
+- `ContourConfig.UNIT_HIERARCHY` у `js/contour-config.js` є єдиним джерелом parent-зв’язків **угруповання → АК → підрозділ**.
+- Автовизначення за порядком рядків ГОЧ і naming heuristic `АК` видалене з `contour-units.js`.
+- Якщо назва є в Excel, але відсутня в `UNIT_HIERARCHY`, вона лишається окремим невизначеним вузлом і не отримує parent автоматично.
+- Початковий explicit config перенесено зі знімка поточної bundled-книги; browser test вимагає `ContourUnits.catalog.unconfigured` бути порожнім для неї.
+- У таблиці окрема кнопка `+ / −` відповідає тільки за розгортання/згортання й розміщується у вирівняному слоті ліворуч від назви.
+- Натискання назви угруповання/АК/підрозділу відкриває штатні деталі; окремої дії `↗` у рядку немає.
+- Для цієї гілки first-party resource revision: **33**.
 
 ## Відкритий технічний борг
 
@@ -33,4 +35,4 @@
 
 ## Поточний фокус
 
-Перевірити точкову UX-зміну hierarchy row actions change-scoped тестами. Не розширювати scope на аналітику, Excel або інші компоненти.
+Перевірити explicit hierarchy config та hierarchy row actions change-scoped тестами. Не розширювати scope на аналітику, Excel або інші компоненти.
