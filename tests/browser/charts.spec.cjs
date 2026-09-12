@@ -58,7 +58,7 @@ test('cross-category comparison builds a shared analytical view',async({page})=>
  await expect(page.locator('#compare-catalog [data-compare-metric]').first()).toBeVisible({timeout:15000});
  await expect(page.locator('#compare-chart .apexcharts-canvas')).toBeVisible({timeout:15000});
  const checked=page.locator('#compare-catalog [data-compare-metric]:checked');expect(await checked.count()).toBeGreaterThanOrEqual(2);
- await expect(page.locator('#compare-data-note')).toContainText('не прирівнюються до нуля');
+ await expect(page.locator('#compare-data-note')).toContainText('Нормалізація');
  await page.locator('[data-compare-mode="absolute"]').click();await expect(page.locator('[data-compare-mode="absolute"]')).toHaveAttribute('aria-pressed','true');
  await page.locator('[data-compare-chart="bar"]').click();await expect(page.locator('[data-compare-chart="bar"]')).toHaveAttribute('aria-pressed','true');
  await expect(page.locator('#compare-table-body tr').first()).toBeVisible();
