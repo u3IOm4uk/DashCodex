@@ -21,7 +21,7 @@ test('hierarchy inference keeps stable parents and rejects ambiguous ones',async
    ];
    const catalog=ContourUnits.buildCatalog({sheets:{[sheet]:{records}}});
    return {
-    groupA,
+    groupA,groupB,
     corpsParent:catalog.index['15 АК']?.parent,
     unitParent:catalog.index['Unit A']?.parent,
     unitBParent:catalog.index['Unit B']?.parent,
@@ -31,7 +31,7 @@ test('hierarchy inference keeps stable parents and rejects ambiguous ones',async
  });
  expect(result.corpsParent).toBe(result.groupA);
  expect(result.unitParent).toBe('15 АК');
- expect(result.unitBParent).toBe(ContourConfigFallback=false?null:null);
+ expect(result.unitBParent).toBe(result.groupB);
  expect(result.sharedParent).toBeNull();
  expect(result.sharedAmbiguous).toBe(true);
 });
