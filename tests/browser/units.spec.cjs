@@ -10,36 +10,45 @@ async function rowIndexBy(page,key,value,visibleOnly=false){
  return page.locator('#table-body tr').evaluateAll((rows,args)=>rows.findIndex(row=>row.dataset[args.key]===args.value&&(!args.visibleOnly||!row.hidden)),{key,value,visibleOnly});
 }
 
-test('hierarchy inference keeps stable parents and rejects ambiguous ones',async({page})=>{
+test('explicit hierarchy config defines parents and leaves unknown rows unconfigured',async({page})=>{
  await openDashboard(page);
  const result=await page.evaluate(()=>{
    const [groupA,groupB]=ContourConfig.GROUP_NAMES;
    const sheet=ContourConfig.WORKBOOK_SCHEMA.sheets.ops;
-   const records=[
-    {date:'2026-01-01',row:1,group:groupA},{date:'2026-01-01',row:2,group:'15 АК'},{date:'2026-01-01',row:3,group:'Unit A'},{date:'2026-01-01',row:4,group:groupB},{date:'2026-01-01',row:5,group:'Unit B'},{date:'2026-01-01',row:6,group:'Shared'},
-    {date:'2026-01-02',row:1,group:groupA},{date:'2026-01-02',row:2,group:'15 АК'},{date:'2026-01-02',row:3,group:'Unit A'},{date:'2026-01-02',row:4,group:'Shared'},{date:'2026-01-02',row:5,group:groupB},{date:'2026-01-02',row:6,group:'Unit B'}
+   const hierarchy=[
+    {name:groupA,children:[{name:'15 АК',children:[{name:'Unit A'}]}]},
+    {name:groupB,children:[{name:'Unit B'}]}
    ];
-   const catalog=ContourUnits.buildCatalog({sheets:{[sheet]:{records}}});
+   const records=[
+    {date:'2026-01-01',row:1,group:'Unit A'},
+    {date:'2026-01-01',row:2,group:groupB},
+    {date:'2026-01-01',row:3,group:'15 АК'},
+    {date:'2026-01-01',row:4,group:'Shared'},
+    {date:'2026-01-01',row:5,group:groupA},
+    {date:'2026-01-01',row:6,group:'Unit B'}
+   ];
+   const catalog=ContourUnits.buildCatalog({sheets:{[sheet]:{records}}},hierarchy);
    return {
     groupA,groupB,
     corpsParent:catalog.index['15 АК']?.parent,
     unitParent:catalog.index['Unit A']?.parent,
     unitBParent:catalog.index['Unit B']?.parent,
     sharedParent:catalog.index.Shared?.parent,
-    sharedAmbiguous:catalog.index.Shared?.ambiguous
+    sharedUnconfigured:catalog.index.Shared?.unconfigured,
+    unconfigured:catalog.unconfigured
    };
  });
  expect(result.corpsParent).toBe(result.groupA);
  expect(result.unitParent).toBe('15 АК');
  expect(result.unitBParent).toBe(result.groupB);
  expect(result.sharedParent).toBeNull();
- expect(result.sharedAmbiguous).toBe(true);
+ expect(result.sharedUnconfigured).toBe(true);
+ expect(result.unconfigured).toEqual(['Shared']);
 });
 
-test('expand control is aligned before the name and the name opens details',async({page})=>{
+test('configured hierarchy expands and the name opens details',async({page})=>{
  await openDashboard(page);
- const snapshot=await page.evaluate(()=>ContourUnits.catalog.nodes.map(({name,parent,level,ambiguous,children})=>({name,parent,level,ambiguous,children})));
- console.log('UNIT_CATALOG:'+JSON.stringify(snapshot));
+ expect(await page.evaluate(()=>ContourUnits.catalog.unconfigured)).toEqual([]);
  const parent=page.locator('#table-body tr.unit-parent').first();
  await expect(parent).toBeVisible();
  const parentName=await parent.getAttribute('data-unit-name');
