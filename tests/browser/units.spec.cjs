@@ -99,6 +99,15 @@ test('configured hierarchy renders below parent with branch, detail breakdown an
  await parent.locator('.row-button').click();
  await expect(page.locator('#detail-dialog')).toBeVisible();
  await expect(page.locator('#detail-name')).toHaveText(parentName);
+ await expect(page.locator('#detail-dialog > .sheet-heading')).toHaveCSS('margin-bottom','10px');
+ const trendLayout=await page.locator('#detail-content .detail-trend').evaluate(trend=>{
+   const title=trend.querySelector('h3')?.getBoundingClientRect(),period=trend.querySelector('p')?.getBoundingClientRect(),controls=trend.querySelector('.detail-chart-controls')?.getBoundingClientRect();
+   return title&&period&&controls?{textTop:title.top,textBottom:period.bottom,textRight:Math.max(title.right,period.right),controlsTop:controls.top,controlsBottom:controls.bottom,controlsLeft:controls.left}:null;
+ });
+ expect(trendLayout).not.toBeNull();
+ expect(trendLayout.controlsTop).toBeLessThan(trendLayout.textBottom);
+ expect(trendLayout.controlsBottom).toBeGreaterThan(trendLayout.textTop);
+ expect(trendLayout.controlsLeft).toBeGreaterThan(trendLayout.textRight);
  const detailTable=page.locator('#detail-content .detail-hierarchy-table');
  await expect(detailTable).toBeVisible();
  await expect(detailTable.locator('thead th').nth(1)).toHaveText('Підрозділ');
