@@ -2,7 +2,7 @@
 'use strict';
 const C=root.ContourConfig||(typeof module!=='undefined'&&module.exports?require('./contour-config.js'):null);
 if(!C)throw new Error('ContourConfig має бути завантажений перед ContourData.');
-const S=C.WORKBOOK_SCHEMA,F=S.fields,P=C.APP_CONFIG.datePolicy;
+const S=C.WORKBOOK_SCHEMA,F=S.fields,P=C.APP_CONFIG.datePolicy,PERF=C.APP_CONFIG.performance;
 const colors={blue:'#008FFB',red:'#FF4560',gold:'#c2bd51',green:'#10B981',violet:'#aa91de',cyan:'#5dc9d8'};
 const metric=(id,name,fields,labels,ink,unit='од.')=>({id,name,fields:[...fields],labels,colors:ink,unit});
 const operational=[
@@ -38,6 +38,20 @@ const ovgp=rawSheets[S.sheets.ovgp];if(ovgp?.length){const headers=(ovgp[0]||[])
 for(const [sheetName,fields] of [[S.sheets.compare,fieldList(F.compare)],[S.sheets.personnel,fieldList(F.personnel)]]){const raw=rawSheets[sheetName];if(!raw?.length)continue;const headers=(raw[0]||[]).map(clean),missing=fields.filter(field=>!headers.includes(field));if(missing.length)warnings.push(issue('optional-fields',sheetName,`Не знайдено поля: ${missing.join(', ')}.`))}
 return {valid:errors.length===0,errors,warnings,rawSheets};
 }
+
+const cacheableModels=new WeakSet(),runtimeCaches=new WeakMap();
+function runtimeFor(data){let runtime=runtimeCaches.get(data);if(!runtime){runtime={sheets:new Map(),aggregates:new Map(),stats:{indexBuilds:0,aggregateHits:0,aggregateMisses:0}};runtimeCaches.set(data,runtime)}return runtime}
+function markCacheable(data){cacheableModels.add(data);runtimeFor(data);return data}
+function nestedPush(map,key,subkey,row){let nested=map.get(key);if(!nested){nested=new Map();map.set(key,nested)}let rows=nested.get(subkey);if(!rows){rows=[];nested.set(subkey,rows)}rows.push(row)}
+function sheetIndex(data,sheetName){const runtime=runtimeFor(data);if(runtime.sheets.has(sheetName))return runtime.sheets.get(sheetName);const byDate=new Map(),byDateGroup=new Map(),byDateType=new Map(),records=data.sheets[sheetName]?.records||[];for(const row of records){let rows=byDate.get(row.date);if(!rows){rows=[];byDate.set(row.date,rows)}rows.push(row);if(row.group)nestedPush(byDateGroup,row.date,row.group,row);if(row.type)nestedPush(byDateType,row.date,row.type,row)}const index={byDate,byDateGroup,byDateType};runtime.sheets.set(sheetName,index);runtime.stats.indexBuilds++;return index}
+function rawRowsForDay(index,cat,day){if(cat.type)return index.byDateType.get(day)?.get(cat.type)||[];return index.byDate.get(day)||[]}
+function selectedRowsForDay(index,section,cat,day,group){if(section.id==='ops')return index.byDateGroup.get(day)?.get(group||S.rows.opsSummary)||[];return rawRowsForDay(index,cat,day)}
+function aggregateKey(section,cat,from,to,group){return [section.id,section.sheet,cat.id||'',cat.type||'',cat.fields.join('\u001f'),from,to,group||''].join('\u001e')}
+function cachedAggregate(data,key){if(!cacheableModels.has(data))return undefined;const runtime=runtimeFor(data);if(!runtime.aggregates.has(key)){runtime.stats.aggregateMisses++;return undefined}const value=runtime.aggregates.get(key);runtime.aggregates.delete(key);runtime.aggregates.set(key,value);runtime.stats.aggregateHits++;return value}
+function storeAggregate(data,key,value){if(!cacheableModels.has(data))return value;const runtime=runtimeFor(data),limit=Math.max(1,Number(PERF?.aggregateCacheEntries)||384);if(runtime.aggregates.has(key))runtime.aggregates.delete(key);while(runtime.aggregates.size>=limit)runtime.aggregates.delete(runtime.aggregates.keys().next().value);runtime.aggregates.set(key,value);return value}
+function clearPerformanceCaches(data){const runtime=runtimeCaches.get(data);if(!runtime)return;runtime.sheets.clear();runtime.aggregates.clear();runtime.stats={indexBuilds:0,aggregateHits:0,aggregateMisses:0}}
+function performanceStats(data){const runtime=runtimeCaches.get(data);if(!runtime)return {cacheable:false,indexedSheets:0,aggregateEntries:0,indexBuilds:0,aggregateHits:0,aggregateMisses:0};return {cacheable:cacheableModels.has(data),indexedSheets:runtime.sheets.size,aggregateEntries:runtime.aggregates.size,...runtime.stats}}
+
 function parse(wb,XLSX){const inspection=validateWorkbook(wb,XLSX);if(!inspection.valid){const error=new Error(inspection.errors.map(x=>x.message).join(' '));error.name='WorkbookValidationError';error.validation={errors:inspection.errors,warnings:inspection.warnings};throw error}const sheets={},quality=[];
 for(const name of wb.SheetNames){const raw=inspection.rawSheets[name]||[];if(!raw.length)continue;const headers=raw[0].map(clean),records=[];let errors=Object.values(wb.Sheets[name]).filter(c=>c&&(c.t==='e'||(typeof c.v==='string'&&/^#(REF!|DIV\/0!|VALUE!|N\/A|NAME\?|NUM!|NULL!)/.test(c.v)))).length,blankRows=0;
 for(let i=name===S.sheets.ovgp?2:1;i<raw.length;i++){const row=raw[i],d=date(row[0]);if(!d){blankRows++;continue}
@@ -45,14 +59,14 @@ if(name===S.sheets.ovgp){if(!row[1]||!row[2])continue;const groups={};for(let c=
 else{if(name===S.sheets.ops&&!row[1]){blankRows++;continue}const item={date:d,row:i+1};headers.forEach((h,c)=>{if(h)item[h]=row[c]});item.group=clean(row[1]);records.push(item)}}
 const dates=[...new Set(records.map(r=>r.date))].sort();const keys=new Set();let duplicates=0;for(const r of records){const k=[r.date,r.name||r.group,r.type||''].join('|');if(keys.has(k))duplicates++;keys.add(k)}
 sheets[name]={records,dates,headers};quality.push({name,rows:records.length,from:dates[0],to:dates.at(-1),errors,blankRows,duplicates})}
-return {sheets,quality,validation:{errors:[],warnings:inspection.warnings}}}
+return markCacheable({sheets,quality,validation:{errors:[],warnings:inspection.warnings}})}
 function sections(data){const ov=data.sheets[S.sheets.ovgp];return [
 {id:'ops',name:'Оперативна обстановка',short:'Обстановка',icon:'grid',sheet:S.sheets.ops,categories:operational},
 {id:'ovgp',name:'ОВгП',short:'ОВгП',icon:'layers',sheet:S.sheets.ovgp,categories:ov?[...new Set(ov.records.map(r=>r.type))].map((t,i)=>({...metric('ov'+i,t[0].toUpperCase()+t.slice(1),['ВЗ','БП'],['Вогневі завдання','Боєприпаси'],[colors.green,colors.gold]),type:t})):[]},
 {id:'compare',name:'БК та FPV',short:'БК та FPV',icon:'activity',sheet:S.sheets.compare,categories:comparative},
 {id:'personnel',name:'Облік персоналу',short:'Персонал',icon:'database',sheet:S.sheets.personnel,categories:personnel}].filter(s=>data.sheets[s.sheet]?.records.length)}
 function values(r,cat,section,group){if(section.id==='ovgp')return r.groups[group||S.rows.ovgpTotal]||[null,null];return cat.fields.map(f=>f===F.ops.dronesOther?sum(droneTypes.filter(t=>t.id!=='fpv').map(t=>number(r[t.field]))):number(r[f]))}
-function aggregate(data,section,cat,from,to,group){const raw=(data.sheets[section.sheet]?.records||[]).filter(r=>r.date>=from&&r.date<=to&&(!cat.type||r.type===cat.type));const rows=section.id==='ops'?raw.filter(r=>r.group===(group||S.rows.opsSummary)):raw;const days=[];for(let d=from;d<=to&&days.length<P.maxAggregateDays;d=shift(d,1))days.push(d);const series=cat.fields.map((_,i)=>days.map(day=>sum(rows.filter(r=>r.date===day).map(r=>values(r,cat,section,group)[i]))));const present=days.filter((_,i)=>series.some(s=>s[i]!==null)).length;const totals=cat.fields.map((_,i)=>sum(rows.map(r=>values(r,cat,section,group)[i])));const requestedDays=inclusiveDays(from,to);return {rows,raw,days,series,totals,present,complete:present===days.length,truncated:requestedDays!==null&&requestedDays>days.length}}
+function aggregate(data,section,cat,from,to,group){const key=aggregateKey(section,cat,from,to,group),cached=cachedAggregate(data,key);if(cached!==undefined)return cached;const days=[];for(let d=from;d<=to&&days.length<P.maxAggregateDays;d=shift(d,1))days.push(d);const index=sheetIndex(data,section.sheet),rawByDay=days.map(day=>rawRowsForDay(index,cat,day)),selectedByDay=days.map(day=>selectedRowsForDay(index,section,cat,day,group)),raw=rawByDay.flat(),rows=selectedByDay.flat();const series=cat.fields.map((_,i)=>selectedByDay.map(dayRows=>sum(dayRows.map(r=>values(r,cat,section,group)[i]))));const present=days.filter((_,i)=>series.some(s=>s[i]!==null)).length;const totals=cat.fields.map((_,i)=>sum(rows.map(r=>values(r,cat,section,group)[i])));const requestedDays=inclusiveDays(from,to),result={rows,raw,days,series,totals,present,complete:present===days.length,truncated:requestedDays!==null&&requestedDays>days.length};return storeAggregate(data,key,result)}
 function contextRange(dates,from,to){
 if(from!==to||!dates.length)return {from,to};
 const first=dates[0],last=dates.at(-1);let start=shift(from,-P.contextBeforeDays),end=shift(from,P.contextAfterDays);
@@ -63,5 +77,5 @@ return {from:start,to:end};
 function change(value,previous,complete=true){if(!complete||value===null||previous===null)return {delta:null,percent:null};return {delta:value-previous,percent:previous===0?(value===0?0:null):(value-previous)/Math.abs(previous)*100}}
 function axisRange(values,includeZero=false){const finite=values.filter(v=>typeof v==='number'&&Number.isFinite(v));if(!finite.length)return {min:0,max:1};let lo=Math.min(...finite),hi=Math.max(...finite);if(includeZero){lo=Math.min(0,lo);hi=Math.max(0,hi)}const pad=(hi-lo)*.12||Math.max(Math.abs(hi)*.05,1);return {min:lo>=0?Math.max(0,lo-pad):lo-pad,max:hi+pad}}
 function integerAxis(values,includeZero=false){const range=axisRange(values,includeZero),rough=Math.max(1,(range.max-range.min)/4),power=10**Math.floor(Math.log10(rough)),step=[1,2,5,10].find(n=>n*power>=rough)*power,min=Math.floor(range.min/step)*step,max=Math.ceil(range.max/step)*step;return {min,max:max>min?max:min+step,tickAmount:Math.max(1,Math.round((max-min)/step))}}
-root.ContourData={config:C,colors,operational,comparative,droneTypes,clean,number,sum,date,shift,inclusiveDays,validateDateRange,validateWorkbook,parse,sections,values,aggregate,contextRange,change,axisRange,integerAxis};if(typeof module!=='undefined')module.exports=root.ContourData;
+root.ContourData={config:C,colors,operational,comparative,droneTypes,clean,number,sum,date,shift,inclusiveDays,validateDateRange,validateWorkbook,parse,sections,values,aggregate,clearPerformanceCaches,performanceStats,contextRange,change,axisRange,integerAxis};if(typeof module!=='undefined')module.exports=root.ContourData;
 })(typeof window!=='undefined'?window:globalThis);
