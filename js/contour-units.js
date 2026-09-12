@@ -8,48 +8,46 @@ const STATUS=Object.freeze({ACTIVE:'active',HIDDEN:'hidden',ARCHIVED:'archived'}
 const STORAGE_KEY='contour.unit-status.v1';
 const validStatus=value=>Object.values(STATUS).includes(value);
 const clean=value=>String(value??'').trim().replace(/\s+/g,' ');
-const isCorps=name=>/(^|\s)\d+\s*АК(?:\s|$)|(^|\s)АК(?:\s|$)/u.test(clean(name));
 
-function buildCatalog(data){
-  const sheet=data?.sheets?.[C.WORKBOOK_SCHEMA.sheets.ops];
-  const records=sheet?.records||[];
-  const summaries=new Set(C.GROUP_NAMES||[]),total=C.WORKBOOK_SCHEMA.rows.opsSummary;
-  const byDate=new Map(),firstOrder=new Map(),allNames=new Set(),votes=new Map();
-  let sequence=0;
-  for(const row of records){
-    const name=clean(row.group);
-    if(!name||name===total)continue;
-    allNames.add(name);
-    if(!firstOrder.has(name))firstOrder.set(name,sequence++);
-    let day=byDate.get(row.date);if(!day){day=[];byDate.set(row.date,day)}day.push(row);
-  }
-  const vote=(name,parent)=>{
-    let map=votes.get(name);if(!map){map=new Map();votes.set(name,map)}
-    const key=parent||'';map.set(key,(map.get(key)||0)+1);
-  };
-  for(const day of [...byDate.values()]){
-    day.sort((a,b)=>(a.row||0)-(b.row||0));
-    let currentGroup=null,currentCorps=null;
-    for(const row of day){
-      const name=clean(row.group);if(!name||name===total)continue;
-      if(summaries.has(name)){
-        currentGroup=name;currentCorps=isCorps(name)?name:null;vote(name,null);continue;
-      }
-      if(isCorps(name)){
-        vote(name,currentGroup);currentCorps=name;continue;
-      }
-      vote(name,currentCorps||currentGroup);
+function hierarchyIndex(hierarchy=C.UNIT_HIERARCHY){
+  const index=Object.create(null);let order=0;
+  const visit=(entries,parent=null,depth=0)=>{
+    for(const entry of entries||[]){
+      const name=clean(entry?.name);if(!name)continue;
+      if(index[name])throw new Error(`Дубль у UNIT_HIERARCHY: ${name}`);
+      index[name]={name,parent,level:depth===0?'group':depth===1?'corps':'unit',order:order++,children:[]};
+      visit(entry.children||[],name,depth+1);
     }
+  };
+  visit(hierarchy||[]);
+  for(const node of Object.values(index))if(node.parent&&index[node.parent])index[node.parent].children.push(node.name);
+  return index;
+}
+
+function buildCatalog(data,hierarchy=C.UNIT_HIERARCHY){
+  const sheet=data?.sheets?.[C.WORKBOOK_SCHEMA.sheets.ops];
+  const records=sheet?.records||[],total=C.WORKBOOK_SCHEMA.rows.opsSummary;
+  const firstOrder=new Map(),allNames=new Set();let sequence=0;
+  for(const row of records){
+    const name=clean(row.group);if(!name||name===total)continue;
+    allNames.add(name);if(!firstOrder.has(name))firstOrder.set(name,sequence++);
   }
+  const configured=hierarchyIndex(hierarchy);
   const nodes=[...allNames].map(name=>{
-    const summary=summaries.has(name),map=votes.get(name)||new Map([['',1]]),parents=[...map.keys()].map(x=>x||null);
-    const parent=summary?null:(parents.length===1?parents[0]:null),ambiguous=!summary&&parents.length>1;
-    return {name,parent,level:summary?'group':isCorps(name)?'corps':'unit',ambiguous,order:firstOrder.get(name)??Number.MAX_SAFE_INTEGER,children:[]};
+    const definition=configured[name],configuredParent=definition?.parent||null;
+    return {
+      name,
+      parent:configuredParent&&allNames.has(configuredParent)?configuredParent:null,
+      level:definition?.level||'unit',
+      unconfigured:!definition,
+      order:definition?.order??(100000+(firstOrder.get(name)??Number.MAX_SAFE_INTEGER)),
+      children:[]
+    };
   }).sort((a,b)=>a.order-b.order||a.name.localeCompare(b.name,'uk'));
   const index=Object.create(null);nodes.forEach(node=>{index[node.name]=node});
-  for(const node of nodes){if(node.parent&&index[node.parent])index[node.parent].children.push(node.name)}
+  for(const node of nodes)if(node.parent&&index[node.parent])index[node.parent].children.push(node.name);
   const roots=nodes.filter(node=>!node.parent).map(node=>node.name);
-  return {nodes,index,roots,ambiguous:nodes.filter(node=>node.ambiguous).map(node=>node.name)};
+  return {nodes,index,roots,unconfigured:nodes.filter(node=>node.unconfigured).map(node=>node.name)};
 }
 
 function loadStatuses(storage){
@@ -64,9 +62,9 @@ function saveStatuses(storage,statuses){
   try{storage?.setItem(STORAGE_KEY,JSON.stringify(statuses))}catch{}
 }
 
-let data=null,catalog={nodes:[],index:Object.create(null),roots:[],ambiguous:[]},statuses={},showArchived=false;
+let data=null,catalog={nodes:[],index:Object.create(null),roots:[],unconfigured:[]},statuses={},showArchived=false;
 const expanded=new Set();
-let bypassDetail=null,refreshQueued=false,observer=null;
+let refreshQueued=false,observer=null;
 const storage=typeof localStorage!=='undefined'?localStorage:null;
 statuses=loadStatuses(storage);
 
@@ -101,7 +99,7 @@ function renderManager(){
   if(!catalog.nodes.length){list.innerHTML='<p class="focus-note">У поточній книзі немає структури ГОЧ.</p>';return}
   list.innerHTML=catalog.nodes.map(node=>{
     const parent=node.parent?`<small>${escapeHtml(node.parent)}</small>`:'<small>верхній рівень</small>';
-    const issue=node.ambiguous?'<em>склад не визначено однозначно</em>':'';
+    const issue=node.unconfigured?'<em>не визначено у contour-config.js</em>':'';
     return `<label class="unit-manager-row unit-manager-${node.level}" style="--unit-depth:${node.level==='group'?0:node.level==='corps'?1:2}"><span><strong>${escapeHtml(node.name)}</strong>${parent}${issue}</span><select data-unit-status="${escapeAttr(node.name)}" aria-label="Статус: ${escapeAttr(node.name)}"><option value="active"${statusOf(node.name)==='active'?' selected':''}>Активний</option><option value="hidden"${statusOf(node.name)==='hidden'?' selected':''}>Прихований</option><option value="archived"${statusOf(node.name)==='archived'?' selected':''}>Архів</option></select></label>`;
   }).join('');
   list.querySelectorAll('[data-unit-status]').forEach(select=>select.onchange=()=>setStatus(select.dataset.unitStatus,select.value));
@@ -112,29 +110,28 @@ const escapeAttr=escapeHtml;
 function decorateRow(row,node){
   if(row.dataset.unitEnhanced==='1')return;
   row.dataset.unitEnhanced='1';row.dataset.unitName=node.name;row.dataset.unitLevel=node.level;if(node.parent)row.dataset.unitParent=node.parent;
-  row.classList.add('unit-row',`unit-level-${node.level}`);if(node.ambiguous)row.classList.add('unit-ambiguous');
-  const cell=row.querySelector('td:first-child'),button=row.querySelector('.row-button'),name=button?.querySelector('.row-name');if(!cell||!button||!name)return;
+  row.classList.add('unit-row',`unit-level-${node.level}`);if(node.unconfigured)row.classList.add('unit-unconfigured');
+  const cell=row.querySelector('td:first-child'),button=row.querySelector('.row-button'),name=button?.querySelector('.row-name'),index=button?.querySelector('.row-index');if(!cell||!button||!name||!index)return;
+  const main=document.createElement('div');main.className='unit-row-main';main.append(index);
   if(node.children.length){
-    row.classList.add('unit-parent');button.setAttribute('aria-label',`Розгорнути: ${node.name}`);
-    const expand=document.createElement('button');expand.type='button';expand.className='unit-expand';expand.setAttribute('aria-label',`Розгорнути: ${node.name}`);expand.onclick=event=>{event.preventDefault();event.stopPropagation();toggle(node.name)};cell.insertBefore(expand,button);
-    const detail=document.createElement('button');detail.type='button';detail.className='unit-detail';detail.textContent='↗';detail.setAttribute('aria-label',`Відкрити деталі: ${node.name}`);detail.onclick=event=>{event.preventDefault();event.stopPropagation();bypassDetail=node.name;button.click();bypassDetail=null};cell.append(detail);
+    row.classList.add('unit-parent');
+    const expand=document.createElement('button');expand.type='button';expand.className='unit-expand';expand.setAttribute('aria-label',`Розгорнути: ${node.name}`);expand.onclick=event=>{event.preventDefault();event.stopPropagation();toggle(node.name)};main.append(expand);
+  }else{
+    const slot=document.createElement('span');slot.className='unit-expand-slot';slot.setAttribute('aria-hidden','true');main.append(slot);
   }
-  if(node.ambiguous){const badge=document.createElement('span');badge.className='unit-badge';badge.textContent='склад ?';name.after(badge)}
+  main.append(button);cell.append(main);
+  if(node.unconfigured){const badge=document.createElement('span');badge.className='unit-badge';badge.textContent='не в конфіг.';name.after(badge)}
 }
 function toggle(name){if(expanded.has(name))expanded.delete(name);else expanded.add(name);applyTableState()}
 function applyTableState(){
   if(typeof document==='undefined')return;ensureControls();ensureDialog();const controls=document.querySelector('#unit-controls');if(controls)controls.hidden=!isOpsTable();if(!isOpsTable())return;
   const archiveToggle=document.querySelector('#unit-archive-toggle');if(archiveToggle){archiveToggle.setAttribute('aria-pressed',String(showArchived));const count=catalog.nodes.filter(n=>statusOf(n.name)===STATUS.ARCHIVED).length;archiveToggle.textContent=`Архів${count?' · '+count:''}`}
   const rows=[...document.querySelectorAll('#table-body tr')];
-  for(const row of rows){const name=clean(row.querySelector('.row-name')?.textContent),node=nodeOf(name);if(!node)continue;decorateRow(row,node);const status=statusOf(node.name);row.classList.toggle('unit-status-archived',status===STATUS.ARCHIVED);row.classList.toggle('unit-status-hidden',status===STATUS.HIDDEN);row.hidden=!visibleNode(node);const expand=row.querySelector('.unit-expand');if(expand){const open=expanded.has(node.name);expand.setAttribute('aria-expanded',String(open));expand.textContent=open?'−':'+';expand.setAttribute('aria-label',`${open?'Згорнути':'Розгорнути'}: ${node.name}`);const rowButton=row.querySelector('.row-button');if(rowButton)rowButton.setAttribute('aria-label',`${open?'Згорнути':'Розгорнути'}: ${node.name}`)}}
+  for(const row of rows){const name=clean(row.querySelector('.row-name')?.textContent),node=nodeOf(name);if(!node)continue;decorateRow(row,node);const status=statusOf(node.name);row.classList.toggle('unit-status-archived',status===STATUS.ARCHIVED);row.classList.toggle('unit-status-hidden',status===STATUS.HIDDEN);row.hidden=!visibleNode(node);const expand=row.querySelector('.unit-expand');if(expand){const open=expanded.has(node.name);expand.setAttribute('aria-expanded',String(open));expand.textContent=open?'−':'+';expand.setAttribute('aria-label',`${open?'Згорнути':'Розгорнути'}: ${node.name}`)}}
 }
 function requestRefresh(){if(typeof document==='undefined'||refreshQueued)return;refreshQueued=true;queueMicrotask(()=>{refreshQueued=false;applyTableState()})}
 function bootDom(){
   if(typeof document==='undefined')return;ensureControls();ensureDialog();const body=document.querySelector('#table-body');if(!body)return;
-  body.addEventListener('click',event=>{
-    const button=event.target.closest('.row-button');if(!button||!body.contains(button))return;const row=button.closest('tr'),node=nodeOf(row?.dataset.unitName||button.querySelector('.row-name')?.textContent);if(!node?.children.length||bypassDetail===node.name)return;
-    event.preventDefault();event.stopImmediatePropagation();toggle(node.name);
-  },true);
   observer=new MutationObserver(()=>requestRefresh());observer.observe(body,{childList:true});requestRefresh();
 }
 function wrapParser(){
@@ -143,6 +140,6 @@ function wrapParser(){
 }
 
 wrapParser();if(typeof document!=='undefined')bootDom();
-const api={STATUS,STORAGE_KEY,isCorps,buildCatalog,loadStatuses,statusOf,setStatus,get catalog(){return catalog},get data(){return data}};
+const api={STATUS,STORAGE_KEY,buildCatalog,loadStatuses,statusOf,setStatus,get catalog(){return catalog},get data(){return data}};
 root.ContourUnits=api;if(typeof module!=='undefined')module.exports=api;
 })(typeof window!=='undefined'?window:globalThis);

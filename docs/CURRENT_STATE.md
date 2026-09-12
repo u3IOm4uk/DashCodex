@@ -1,6 +1,6 @@
 # Поточний стан
 
-Оновлено: **2026-09-12**. Етапи 1–4 злиті у `main`. Етап 5 — **unit hierarchy & archive** — виконується у гілці `feature/unit-hierarchy-archive`, draft PR #5.
+Оновлено: **2026-09-12**. Етапи 1–5 завершені та злиті у `main`. Stage 5 (unit hierarchy & archive) увійшов у `main` squash-комітом `73fae8d`.
 
 ## Стабільний `main`
 
@@ -9,32 +9,22 @@
 - `source.kind` відділений від filename.
 - `aggregate()` використовує lazy indexes + bounded LRU cache без зміни числової семантики.
 - `contour-view.js`, `contour-charts.js`, `contour-navigation.js` винесені окремо від основного orchestration.
-- Legacy sidebar/donut DOM прибрані.
 - Sticky-категорії зберігають compact/pinned стан при зміні категорії; переміщується контент під ними.
-- Change-scoped GitHub Actions уже є merge gate: syntax/regression/browser checks запускаються лише за релевантним diff.
-- Playwright scopes: `core`, `sticky`, `charts`, `bps`; resource revision перевіряється окремо.
+- Change-scoped GitHub Actions є merge gate: syntax/regression/browser checks запускаються лише за релевантним diff.
+- Playwright scopes: `core`, `sticky`, `charts`, `bps`, `units`; resource revision перевіряється окремо.
+- Статуси `active / hidden / archived` зберігаються лише локально; архівування не змінює Excel або normalized records.
+- First-party resource revision у `main`: **31**.
 
-## Етап 5 — робоча гілка
+## Поточна робоча зміна
 
-- Додано `js/contour-units.js` і `css/contour-units.css`.
-- Каталог підрозділів будується з повного ГОЧ після `ContourData.parse()`.
-- Ієрархія визначається за стабільним порядком рядків по датах: **угруповання → АК → підрозділ**.
-- Якщо той самий підрозділ у джерелі потрапляє під різних батьків, parent не вигадується; вузол позначається як неоднозначний.
-- Батьківські значення не обчислюються із дочірніх — у таблиці лишаються значення джерела, тому подвійного підсумовування немає.
-- Батьківський рядок розгортає/згортає дочірні; окрема дія відкриває його деталі.
-- Статуси: `active`, `hidden`, `archived`.
-- Статуси зберігаються тільки в `localStorage` як UI-настройка; Excel і нормалізовані записи не змінюються.
-- Архівовані підрозділи приховані за замовчуванням, але можуть бути показані через «Архів» і відкривати історичні деталі за період, у якому є записи.
-- First-party resource revision у Stage 5: **31**.
-- Додано окремий change-scoped browser test `tests/browser/units.spec.cjs`.
-
-## Git/GitHub
-
-- Канонічний репозиторій: `u3IOm4uk/DashCodex`.
-- Базова гілка: `main`.
-- Поточна гілка: `feature/unit-hierarchy-archive`.
-- Draft PR: **#5 — Stage 5: unit hierarchy and archive**.
-- Merge у `main` — лише після green CI та перевірки сценарію ієрархії/архіву.
+- Гілка: `fix/unit-hierarchy-row-actions`, draft PR #6.
+- `ContourConfig.UNIT_HIERARCHY` у `js/contour-config.js` є єдиним джерелом parent-зв’язків **угруповання → АК → підрозділ**.
+- Автовизначення за порядком рядків ГОЧ і naming heuristic `АК` видалене з `contour-units.js`.
+- Якщо назва є в Excel, але відсутня в `UNIT_HIERARCHY`, вона лишається окремим невизначеним вузлом і не отримує parent автоматично.
+- Початковий explicit config перенесено зі знімка поточної bundled-книги; browser test вимагає `ContourUnits.catalog.unconfigured` бути порожнім для неї.
+- У таблиці окрема кнопка `+ / −` відповідає тільки за розгортання/згортання й розміщується у вирівняному слоті ліворуч від назви.
+- Натискання назви угруповання/АК/підрозділу відкриває штатні деталі; окремої дії `↗` у рядку немає.
+- Для цієї гілки first-party resource revision: **33**.
 
 ## Відкритий технічний борг
 
@@ -45,4 +35,4 @@
 
 ## Поточний фокус
 
-Завершити Stage 5: green change-scoped CI, browser review і синхронізація контрактів ієрархії/архіву. Не розширювати scope на нові аналітичні фічі до стабілізації цієї моделі.
+Перевірити explicit hierarchy config та hierarchy row actions change-scoped тестами. Не розширювати scope на аналітику, Excel або інші компоненти.
