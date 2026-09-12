@@ -6,13 +6,15 @@ const resources=[
  'css/contour-detail.css',
  'css/contour-refinement.css',
  'css/contour-units.css',
+ 'css/contour-compare.css',
  'js/contour-config.js',
  'js/contour-data.js',
  'js/contour-units.js',
  'js/contour-view.js',
  'js/contour-charts.js',
  'js/contour-navigation.js',
- 'js/contour.js'
+ 'js/contour.js',
+ 'js/contour-compare.js'
 ];
 const escape=value=>value.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
 let html=fs.readFileSync(file,'utf8');
