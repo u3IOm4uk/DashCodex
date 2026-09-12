@@ -3,7 +3,9 @@
   "private": true,
   "scripts": {
     "test:regression": "node .audit/verify-contour.cjs",
-    "test:browser": "playwright test"
+    "test:browser": "playwright test",
+    "version:check": "node scripts/resource-version.cjs --check",
+    "version:bump": "node scripts/resource-version.cjs"
   },
   "devDependencies": {
     "@playwright/test": "1.55.0"
