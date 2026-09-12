@@ -23,9 +23,10 @@ const browserCore=testInfra||changed(/^(index\.html|css\/contour.*\.css|js\/cont
 const browserSticky=testInfra||changed(/^(js\/contour-navigation\.js|tests\/browser\/sticky\.spec\.cjs)$/)||patch(/cards-away|workspace-dock|dockScroll|selectCategory|followCategory|scrollTo|sticky|rail-heading|#metrics/i);
 const browserBps=testInfra||changed(/^(css\/contour-detail\.css|tests\/browser\/bps\.spec\.cjs)$/)||patch(/БпС|FPV|drone|drones|droneTypes|showDroneDetail|drone-type|droneCategory/i);
 const browserCharts=testInfra||changed(/^(js\/contour-charts\.js|tests\/browser\/charts\.spec\.cjs)$/)||patch(/ApexCharts|chart|temporalOptions|miniBar|axisRange|integerAxis|graph-tabs|data-chart/i);
+const browserUnits=testInfra||changed(/^(js\/contour-units\.js|css\/contour-units\.css|tests\/browser\/units\.spec\.cjs)$/)||patch(/unit-manager|unit-status|unit-expand|archiv|ієрарх|підрозділ|угрупован/i);
 const syntaxFiles=files.filter(firstPartyJs);
 const syntax=syntaxFiles.length>0;
-const scope={base,head,files,syntax,syntaxFiles,resourceVersion,regression,browserCore,browserSticky,browserBps,browserCharts,testInfra};
+const scope={base,head,files,syntax,syntaxFiles,resourceVersion,regression,browserCore,browserSticky,browserBps,browserCharts,browserUnits,testInfra};
 console.log(JSON.stringify(scope,null,2));
 if(process.env.GITHUB_OUTPUT){
  const lines=[
@@ -36,6 +37,7 @@ if(process.env.GITHUB_OUTPUT){
   `browser_sticky=${browserSticky}`,
   `browser_bps=${browserBps}`,
   `browser_charts=${browserCharts}`,
+  `browser_units=${browserUnits}`,
   'syntax_files<<QUALITY_EOF',
   ...syntaxFiles,
   'QUALITY_EOF'
