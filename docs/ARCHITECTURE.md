@@ -19,7 +19,7 @@
 | `css/contour-detail.css` | Парні показники й типи БпС |
 | `css/contour-refinement.css` | Чинні уточнення sticky/navigation/щільності |
 | `css/contour-units.css` | Ієрархічна таблиця, archive/status manager |
-| `css/contour-compare.css` | Двоколонковий desktop та full-screen mobile layout конструктора порівняння |
+| `css/contour-compare.css` | Трипанельний desktop layout та одноколонковий mobile layout конструктора порівняння |
 | `js/xlsx.full.min.js`, `js/apexcharts.js` | Локальні SheetJS та ApexCharts |
 | `.audit/` | Data/regression checks і workbook profiling |
 | `tests/browser/` | Change-scoped Playwright scenarios |
@@ -29,7 +29,7 @@
 
 Unit presentation-гілка після parse: **parsed GOCh records + `ContourConfig.UNIT_HIERARCHY` → `ContourUnits.buildCatalog` → hierarchy/status view → існуюча detail table**. Вона не змінює normalized records і не входить у aggregate math.
 
-Comparison flow: **та сама локальна Excel-книга → `ContourData.parse()` → `ContourData.sections()` → каталог доступних серій → окремі `aggregate()` для вибраних показників → presentation-only normalized/absolute transform → ApexCharts + таблиця**. Конструктор не вводить власних source-полів, parent-сум або альтернативної aggregate math.
+Comparison flow: **та сама локальна Excel-книга → `ContourData.parse()` → `ContourData.sections()` → каталог доступних серій + `UNIT_HIERARCHY` → окремі `aggregate()` для вибраних показників/unit-вузлів → optional explicit multi-unit composition → presentation-only normalized/absolute transform → ApexCharts + таблиця**. Конструктор не вводить власних source-полів і не реконструює parent із children.
 
 ## Конфігурація та Excel-контракт
 
@@ -64,6 +64,8 @@ Parent-зв’язки не виводяться з Excel. `buildCatalog()` зі
 5. для bundled контрольної книги `units.spec.cjs` вимагає порожній `catalog.unconfigured`.
 
 Ієрархія впливає тільки на представлення flat table. `+ / −` окремо керує expand/collapse, натискання назви викликає існуючі деталі. Батьківський numeric row не реконструюється з дітей.
+
+У comparison runtime `UNIT_HIERARCHY` індексується окремо лише для UI selection state. Вибір parent використовує його власний `aggregate(..., group)`. Вибір descendant прибирає ancestor зі scope, а вибір parent прибирає descendants; це не дозволяє подвійно врахувати один hierarchy path. Якщо явно обрано кілька неперекривних вузлів, їхні власні серії композиційно сумуються тільки в `contour-compare.js`; день із хоча б одним `null` лишається `null`.
 
 ## Unit status і локальна persistence
 
@@ -102,7 +104,7 @@ Preset «Увесь період» може бути ширшим за manual UX
 
 `contour-units.js` має власний presentation state (`catalog`, `expanded`, status overrides, showArchived) і не володіє analytics state. Він спостерігає rerender `#table-body` через `MutationObserver` і повторно накладає hierarchy state на нові rows.
 
-`contour-compare.js` має окремий локальний state: parsed model/source metadata, metric catalog, selected series, comparison period, unit filter, chart/value modes та chart instance. Цей state не змінює основні `from/to`, section/category або normalized records.
+`contour-compare.js` має окремий локальний state: parsed model/source metadata, metric catalog, selected series, comparison period, selected/expanded unit sets, opened metric categories, chart/value modes та chart instance. Цей state не змінює основні `from/to`, section/category або normalized records.
 
 `contour-view.js`/`contour-charts.js` pure; `contour-navigation.js` не володіє data model. `generation` у main render відсікає stale async chart completion.
 
@@ -120,7 +122,7 @@ Preset «Увесь період» може бути ширшим за manual UX
 
 `ContourCharts.periodRange()` визначає календарне вікно в межах дат джерела. `mountPlotPeriod()` додає пресети й wheel-handler до основного/модального chart-host; події колеса об’єднуються перед оновленням графіка. `mainPlotWindow` та локальне вікно деталей не змінюють облікові `from/to`. Нові точки отримуються через чинний `aggregate()`; кеш/формули не змінені. AbortController і cleanup прибирають wheel-handler та таймер при rerender/закритті деталей.
 
-Comparison chart має власний ApexCharts lifecycle. Режим `normalized` виконує тільки presentation-transform: перше доступне ненульове значення серії = 100; `absolute` використовує вихідні значення. `null` не перетворюється на 0. Unit filter передається в чинний `aggregate()` лише для джерел, де така деталізація існує.
+Comparison chart має власний ApexCharts lifecycle. Режим `normalized` виконує тільки presentation-transform: перше доступне ненульове значення серії = 100; `absolute` використовує вихідні значення. `null` не перетворюється на 0. Unit scope отримує окремі серії через чинний `aggregate(..., group)` лише для джерел із unit-деталізацією; multi-unit composition не змінює `ContourData` або його cache semantics.
 
 ## Імпорт, експорт і запуск
 
