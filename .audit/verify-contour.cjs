@@ -41,6 +41,18 @@ assert.equal(D.sum(typeTotals),D.aggregate(data,ops,allDrones,'2026-09-01','2026
 for(const day of data.sheets[C.WORKBOOK_SCHEMA.sheets.ops].dates){const t=D.droneTypes.map(type=>D.aggregate(data,ops,{...allDrones,fields:[type.field]},day,day).totals[0]);assert.equal(D.sum(t),D.aggregate(data,ops,allDrones,day,day).totals[0]);}
 console.log(JSON.stringify({status:'PASS',checks:'all categories: daily totals, missing periods, zero values, Excel error detection',quality:data.quality,validation:data.validation,ovFirst:ovResult.totals},null,2));
 
+// Parsed models use lazy sheet indexes and an LRU aggregate cache. Synthetic objects stay uncached.
+D.clearPerformanceCaches(data);
+assert.deepEqual(D.performanceStats(data),{cacheable:true,indexedSheets:0,aggregateEntries:0,indexBuilds:0,aggregateHits:0,aggregateMisses:0});
+const cachedFirst=D.aggregate(data,ops,ops.categories[0],'2026-09-03','2026-09-05');
+let perf=D.performanceStats(data);
+assert.equal(perf.indexedSheets,1);assert.equal(perf.indexBuilds,1);assert.equal(perf.aggregateMisses,1);assert.equal(perf.aggregateHits,0);assert.equal(perf.aggregateEntries,1);
+const cachedSecond=D.aggregate(data,ops,ops.categories[0],'2026-09-03','2026-09-05');
+perf=D.performanceStats(data);
+assert.strictEqual(cachedSecond,cachedFirst);assert.equal(perf.aggregateMisses,1);assert.equal(perf.aggregateHits,1);assert.equal(perf.indexBuilds,1);
+assert.equal(D.performanceStats(synthetic).cacheable,false);
+console.log('PASS: parsed aggregate cache and lazy sheet indexes');
+
 // Workbook contract: bad structures fail before parsing; missing optional metrics warn.
 const badBook=X.utils.book_new();
 X.utils.book_append_sheet(badBook,X.utils.aoa_to_sheet([['Дата','Угруповання','Обстріли'],[new Date('2026-09-01T00:00:00Z'),'УВ Тест',1]]),'ГОЧ');
