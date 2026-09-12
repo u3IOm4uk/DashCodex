@@ -59,7 +59,9 @@ test('cross-category comparison builds a shared analytical view with hierarchica
  await categories.first().locator('summary').click();await expect(categories.first().locator('[data-compare-metric]').first()).toBeVisible({timeout:15000});
  await expect(page.locator('#compare-chart .apexcharts-canvas')).toBeVisible({timeout:15000});
  const checked=page.locator('#compare-catalog [data-compare-metric]:checked');expect(await checked.count()).toBeGreaterThanOrEqual(2);
- await expect(page.locator('.compare-units-panel')).toBeVisible();await expect(page.locator('#compare-units-all')).toHaveAttribute('aria-pressed','true');
+ const [metricsBox,workspaceBox,unitsBox]=await Promise.all([page.locator('.compare-metrics-panel').boundingBox(),page.locator('.compare-workspace').boundingBox(),page.locator('.compare-units-panel').boundingBox()]);
+ expect(metricsBox.x+metricsBox.width).toBeLessThanOrEqual(workspaceBox.x+1);expect(unitsBox.x).toBeGreaterThanOrEqual(workspaceBox.x+workspaceBox.width-1);
+ await expect(page.locator('#compare-units-all')).toHaveAttribute('aria-pressed','true');
  const parentToggle=page.locator('#compare-unit-tree [data-unit-toggle]').first(),parentRow=parentToggle.locator('xpath=..'),parentNode=parentRow.locator('xpath=..'),parentInput=parentRow.locator('[data-compare-unit]');
  await parentInput.check();await expect(parentInput).toBeChecked();await expect(parentToggle).toHaveAttribute('aria-expanded','true');
  const children=parentNode.locator('.compare-unit-children [data-compare-unit]');expect(await children.count()).toBeGreaterThanOrEqual(2);await expect(children.first()).toBeVisible();
@@ -69,27 +71,24 @@ test('cross-category comparison builds a shared analytical view with hierarchica
  await page.locator('[data-compare-mode="absolute"]').click();await expect(page.locator('[data-compare-mode="absolute"]')).toHaveAttribute('aria-pressed','true');
  await page.locator('[data-compare-chart="bar"]').click();await expect(page.locator('[data-compare-chart="bar"]')).toHaveAttribute('aria-pressed','true');
  await expect(page.locator('#compare-table-body tr').first()).toBeVisible();
+ await expect(page.locator('.compare-table-panel')).toHaveClass(/panel/);await expect(page.locator('.compare-table-panel')).toHaveClass(/details-panel/);await expect(page.locator('.compare-table-wrap')).toHaveClass(/table-wrap/);
  const dashboardFrom=await page.locator('#from').inputValue(),dashboardTo=await page.locator('#to').inputValue();await page.locator('#compare-dashboard-period').click();await expect(page.locator('#compare-from')).toHaveValue(dashboardFrom);await expect(page.locator('#compare-to')).toHaveValue(dashboardTo);
 });
 
-test('comparison action moves to section navigation and keeps mobile navigation available',async({page})=>{
+test('comparison action keeps mobile navigation and opens filters only by buttons',async({page})=>{
  await page.goto('/');await expect(page.locator('#trend-chart')).toBeVisible({timeout:15000});
  await expect(page.locator('.section-nav-row > #compare-open')).toBeVisible();
  await expect(page.locator('.analysis-tools #compare-open')).toHaveCount(0);
  await page.setViewportSize({width:390,height:844});
  const nav=page.locator('.mobile-nav');
- await expect(nav).toBeVisible();
- await expect(page.locator('#mobile-overview')).toBeVisible();
- await expect(page.locator('#mobile-menu')).toBeVisible();
- await expect(page.locator('#mobile-compare')).toBeVisible();
- await expect(page.locator('#mobile-dates')).toBeHidden();
- await expect(page.locator('#mobile-source')).toBeHidden();
+ await expect(nav).toBeVisible();await expect(page.locator('#mobile-overview')).toBeVisible();await expect(page.locator('#mobile-menu')).toBeVisible();await expect(page.locator('#mobile-compare')).toBeVisible();await expect(page.locator('#mobile-dates')).toBeHidden();await expect(page.locator('#mobile-source')).toBeHidden();
  await page.locator('#mobile-compare').click();
- const dialog=page.locator('#compare-dialog');await expect(dialog).toBeVisible();
- await expect(nav).toBeVisible();
- expect(await dialog.evaluate(el=>el.matches(':modal'))).toBe(false);
- const [dialogBox,navBox,metricsBox,unitsBox]=await Promise.all([dialog.boundingBox(),nav.boundingBox(),page.locator('.compare-metrics-panel').boundingBox(),page.locator('.compare-units-panel').boundingBox()]);
- expect(dialogBox.y+dialogBox.height).toBeLessThanOrEqual(navBox.y+1);expect(metricsBox.x).toBeGreaterThanOrEqual(0);expect(metricsBox.x+metricsBox.width).toBeLessThanOrEqual(391);expect(unitsBox.x+unitsBox.width).toBeLessThanOrEqual(391);
- await expect(page.locator('#compare-catalog .compare-category[open]')).toHaveCount(0);
+ const dialog=page.locator('#compare-dialog');await expect(dialog).toBeVisible();await expect(nav).toBeVisible();expect(await dialog.evaluate(el=>el.matches(':modal'))).toBe(false);
+ const [dialogBox,navBox]=await Promise.all([dialog.boundingBox(),nav.boundingBox()]);expect(dialogBox.y+dialogBox.height).toBeLessThanOrEqual(navBox.y+1);
+ await expect(page.locator('.compare-mobile-pickers')).toBeVisible();await expect(page.locator('.compare-metrics-panel')).toBeHidden();await expect(page.locator('.compare-units-panel')).toBeHidden();
+ await page.locator('label[for="compare-mobile-metrics-toggle"]').click();await expect(page.locator('.compare-metrics-panel')).toBeVisible();await expect(page.locator('#compare-catalog .compare-category[open]')).toHaveCount(0);
+ const metricsBox=await page.locator('.compare-metrics-panel').boundingBox();expect(metricsBox.x).toBeGreaterThanOrEqual(0);expect(metricsBox.x+metricsBox.width).toBeLessThanOrEqual(391);
+ await page.locator('label[for="compare-mobile-metrics-toggle"]').click();await expect(page.locator('.compare-metrics-panel')).toBeHidden();
+ await page.locator('label[for="compare-mobile-units-toggle"]').click();await expect(page.locator('.compare-units-panel')).toBeVisible();const unitsBox=await page.locator('.compare-units-panel').boundingBox();expect(unitsBox.x+unitsBox.width).toBeLessThanOrEqual(391);
  await page.locator('#mobile-overview').click();await expect(dialog).toBeHidden();await expect(nav).toBeVisible();
 });
