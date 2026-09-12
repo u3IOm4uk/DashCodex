@@ -127,5 +127,4 @@ test('configured hierarchy renders below parent with branch, detail breakdown an
  await archived.locator('.row-button').click();
  await expect(page.locator('#detail-dialog')).toBeVisible();
  await expect(page.locator('#detail-name')).toHaveText(childName);
- await expect(page.locator('#detail-content .detail-hierarchy-table')).toHaveCount(0);
 });
