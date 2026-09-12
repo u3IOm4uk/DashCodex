@@ -18,9 +18,9 @@ function temporalOptions({dataApi:D,aggregate:a,labels,colors,height=260,balance
  tooltip:{theme:'dark',x:{formatter:stamp=>fullDate(new Date(stamp).toISOString().slice(0,10))},y:{formatter:v=>fmt(v)}}};
 }
 
-function miniBar({dataApi:D,values,color,days,from,fmt,fullDate}){
- const limits=D.axisRange(values),width=220,height=48,y=v=>height-(v-limits.min)/(limits.max-limits.min)*height+4,zero=y(Math.max(limits.min,0)),step=width/Math.max(values.length,1);
- return `<svg viewBox="0 0 220 58" preserveAspectRatio="none" role="img" aria-label="Динаміка стовпчиками"><line x1="0" x2="220" y1="${zero}" y2="${zero}" stroke="#65716c" opacity=".4"/>${values.map((v,i)=>v===null?'':`<rect x="${i*step+step*.15}" y="${Math.min(y(v),zero)}" width="${Math.max(1,step*.7)}" height="${Math.max(1,Math.abs(y(v)-zero))}" rx="1" fill="${color}"><title>${fullDate(days[i])}: ${fmt(v)}</title></rect>`).join('')}${days.includes(from)?`<line x1="${(days.indexOf(from)+.5)*step}" x2="${(days.indexOf(from)+.5)*step}" y1="0" y2="58" stroke="#c2bd51" stroke-dasharray="3 3"/>`:''}</svg>`;
+function miniBar({dataApi:D,values,color,days,selectedDay=null,fmt,fullDate}){
+ const limits=D.axisRange(values),width=220,height=48,y=v=>height-(v-limits.min)/(limits.max-limits.min)*height+4,zero=y(Math.max(limits.min,0)),step=width/Math.max(values.length,1),selectedIndex=selectedDay?days.indexOf(selectedDay):-1;
+ return `<svg viewBox="0 0 220 58" preserveAspectRatio="none" role="img" aria-label="Динаміка стовпчиками"><line x1="0" x2="220" y1="${zero}" y2="${zero}" stroke="#65716c" opacity=".4"/>${values.map((v,i)=>v===null?'':`<rect x="${i*step+step*.15}" y="${Math.min(y(v),zero)}" width="${Math.max(1,step*.7)}" height="${Math.max(1,Math.abs(y(v)-zero))}" rx="1" fill="${color}"><title>${fullDate(days[i])}: ${fmt(v)}</title></rect>`).join('')}${selectedIndex>=0?`<line x1="${(selectedIndex+.5)*step}" x2="${(selectedIndex+.5)*step}" y1="0" y2="58" stroke="#c2bd51" stroke-dasharray="3 3"/>`:''}</svg>`;
 }
 
 root.ContourCharts={modeLabel,baseOptions,temporalOptions,miniBar};
