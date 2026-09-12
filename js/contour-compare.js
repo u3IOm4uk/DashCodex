@@ -143,9 +143,10 @@ function normalized(values){
 
 function selectedItems(){const map=new Map(catalog.map(item=>[item.id,item]));return [...selected].map(id=>map.get(id)).filter(Boolean)}
 function unitScopeLabel(){const names=[...selectedUnits];if(!names.length)return 'Загальний підсумок';if(names.length<=2)return names.join(' + ');return `Обрано підрозділів: ${names.length}`}
+function sourceSeries(item,days,unit){const aggregate=D.aggregate(model,item.section,item.category,range.from,range.to,unit);return aggregate.series[item.index]||days.map(()=>null)}
 function rawForItem(item,days){
- if(!item.supportsUnit||!selectedUnits.size){const aggregate=D.aggregate(model,item.section,item.category,range.from,range.to);return aggregate.series[item.index]||days.map(()=>null)}
- const scoped=[...selectedUnits].map(name=>{const aggregate=D.aggregate(model,item.section,item.category,range.from,range.to,name);return aggregate.series[item.index]||days.map(()=>null)});
+ if(!item.supportsUnit||!selectedUnits.size)return sourceSeries(item,days);
+ const scoped=[...selectedUnits].map(name=>sourceSeries(item,days,name));
  if(scoped.length===1)return scoped[0];
  return days.map((_,index)=>{const values=scoped.map(series=>series[index]);return values.some(value=>value===null||value===undefined)?null:values.reduce((sum,value)=>sum+value,0)});
 }
@@ -166,16 +167,34 @@ function chartOptions(rows){
  return {...base,chart:{...base.chart,type:chartType,height:420,zoom:{enabled:false}},series:rows.series.map(series=>({name:series.item.categoryName===series.item.name?series.item.name:`${series.item.categoryName} · ${series.item.name}`,data:rows.days.map((day,index)=>({x:dayStamp(day),y:series.values[index]}))})),colors:rows.series.map(series=>series.color),stroke:{...base.stroke,width:chartType==='area'?2.2:0},fill:chartType==='area'?{type:'gradient',gradient:{opacityFrom:.24,opacityTo:.02}}:{type:'solid',opacity:.9},plotOptions:{bar:{columnWidth:'62%',borderRadius:2}},xaxis:{type:'datetime',labels:{datetimeUTC:true,formatter:(value,stamp)=>shortDate(new Date(stamp).toISOString().slice(0,10))},axisBorder:{show:false},axisTicks:{show:false},tooltip:{enabled:false}},yaxis:{...limits,forceNiceScale:false,labels:{formatter:value=>valueMode==='normalized'?`${Math.round(value)}`:fmt(Math.round(value))},title:{text:valueMode==='normalized'?'Індекс, база = 100':'Абсолютне значення'}},tooltip:{theme:'dark',shared:true,intersect:false,x:{formatter:stamp=>fullDate(new Date(stamp).toISOString().slice(0,10))},y:{formatter:value=>value===null||value===undefined?'—':valueMode==='normalized'?`${fmt(Math.round(value*10)/10)} інд.`:fmt(value)}},legend:{...base.legend,onItemClick:{toggleDataSeries:true}}};
 }
 
+function tableData(days,items){
+ const units=[...selectedUnits],scopedItems=items.filter(item=>item.supportsUnit),globalItems=items.filter(item=>!item.supportsUnit);
+ if(!units.length||!scopedItems.length){
+  const values=new Map(items.map(item=>[item.id,sourceSeries(item,days)]));
+  return {showUnit:false,rows:days.map((day,index)=>({day,unit:null,values:items.map(item=>values.get(item.id)[index])}))};
+ }
+ const scoped=new Map();
+ for(const unit of units)for(const item of scopedItems)scoped.set(`${unit}\u001f${item.id}`,sourceSeries(item,days,unit));
+ const globals=new Map(globalItems.map(item=>[item.id,sourceSeries(item,days)])),detail=[];
+ days.forEach((day,index)=>{
+  for(const unit of units)detail.push({day,unit,values:items.map(item=>item.supportsUnit?scoped.get(`${unit}\u001f${item.id}`)[index]:null)});
+  if(globalItems.length)detail.push({day,unit:'Загальні показники',values:items.map(item=>item.supportsUnit?null:globals.get(item.id)[index])});
+ });
+ return {showUnit:true,rows:detail};
+}
+
 function renderTable(rows){
- const head=$('#compare-table-head'),body=$('#compare-table-body');
- head.innerHTML=`<tr><th>Дата</th>${rows.series.map(series=>`<th><span style="color:${series.color}">●</span> ${esc(series.item.name)}</th>`).join('')}</tr>`;
- body.innerHTML=rows.days.map((day,rowIndex)=>`<tr><th scope="row">${fullDate(day)}</th>${rows.series.map(series=>{const value=series.values[rowIndex];return `<td>${value===null?'—':valueMode==='normalized'?fmt(Math.round(value*10)/10):fmt(value)}</td>`}).join('')}</tr>`).join('');
+ const head=$('#compare-table-head'),body=$('#compare-table-body'),foot=$('#compare-table-foot'),items=rows.series.map(series=>series.item),detail=tableData(rows.days,items);
+ const headerName=item=>item.categoryName===item.name?item.name:`${item.categoryName} · ${item.name}`;
+ head.innerHTML=`<tr><th>Дата</th>${detail.showUnit?'<th>Підрозділ</th>':''}${rows.series.map(series=>`<th><span style="color:${series.color}">●</span> ${esc(headerName(series.item))}</th>`).join('')}</tr>`;
+ body.innerHTML=detail.rows.map(row=>`<tr><td>${fullDate(row.day)}</td>${detail.showUnit?`<td class="compare-unit-cell">${esc(row.unit)}</td>`:''}${row.values.map(value=>`<td>${value===null||value===undefined?'—':fmt(value)}</td>`).join('')}</tr>`).join('');
+ if(foot){const globalNote=detail.showUnit&&items.some(item=>!item.supportsUnit)?' · глобальні показники окремим рядком':'';foot.textContent=`Абсолютні значення джерела · ${rows.days.length} дн. · ${items.length} показн.${detail.showUnit?` · ${selectedUnits.size} підрозд.`:''}${globalNote}`}
 }
 
 function renderAnalysis(){
  if(!model||!range.from||!range.to)return;syncButtons();
  const items=selectedItems(),status=$('#compare-status');
- if(!items.length){chart?.destroy();chart=null;$('#compare-chart').innerHTML='';$('#compare-table-head').innerHTML='';$('#compare-table-body').innerHTML='';status.hidden=false;status.textContent='Оберіть показники у блоці «Показники».';return}
+ if(!items.length){chart?.destroy();chart=null;$('#compare-chart').innerHTML='';$('#compare-table-head').innerHTML='';$('#compare-table-body').innerHTML='';if($('#compare-table-foot'))$('#compare-table-foot').textContent='';status.hidden=false;status.textContent='Оберіть показники у блоці «Показники».';return}
  const validation=D.validateDateRange(range.from,range.to);if(!validation.valid){status.hidden=false;status.textContent=validation.reason;return}
  status.hidden=true;const rows=analysisRows();
  chart?.destroy();chart=null;$('#compare-chart').innerHTML='';
