@@ -18,14 +18,16 @@ test('comparison dropdown actions reset metrics and select all non-overlapping l
  await page.locator('label[for="compare-mobile-units-toggle"]').click();
  const unitsPanel=page.locator('.compare-units-panel');
  await expect(unitsPanel.getByRole('button',{name:'Загальний підсумок'})).toHaveCount(0);
- const selectAll=page.locator('#compare-units-select-all'),reset=page.locator('#compare-units-all'),count=page.locator('#compare-unit-count');
+ const heading=unitsPanel.locator('.compare-sidebar-head h3'),selectAll=page.locator('#compare-units-select-all'),reset=page.locator('#compare-units-all'),count=page.locator('#compare-unit-count');
  await expect(selectAll).toHaveClass(/button/);await expect(reset).toHaveClass(/button/);
- await expect(selectAll).toHaveText('Усі');await expect(reset).toHaveText('Скинути');
- const [countBox,allBox,resetBox]=await Promise.all([count.boundingBox(),selectAll.boundingBox(),reset.boundingBox()]);
- expect(Math.abs(countBox.y-allBox.y)).toBeLessThanOrEqual(1);expect(Math.abs(allBox.y-resetBox.y)).toBeLessThanOrEqual(1);
+ await expect(selectAll).toHaveText('Усі');await expect(reset).toHaveText('Скинути');await expect(count).toHaveText('0');
+ const [headingBox,countBox,allBox,resetBox]=await Promise.all([heading.boundingBox(),count.boundingBox(),selectAll.boundingBox(),reset.boundingBox()]);
+ expect(Math.abs(headingBox.y-countBox.y)).toBeLessThanOrEqual(4);expect(Math.abs(countBox.y-allBox.y)).toBeLessThanOrEqual(2);expect(Math.abs(allBox.y-resetBox.y)).toBeLessThanOrEqual(1);
+ expect(allBox.height).toBeLessThanOrEqual(26);expect(resetBox.height).toBeLessThanOrEqual(26);
  const expectedLeaves=await page.locator('#compare-unit-tree [data-compare-unit]').evaluateAll(inputs=>inputs.filter(input=>{const node=input.closest('.compare-unit-node'),child=[...node.children].find(el=>el.classList.contains('compare-unit-children')),runtime=window.ContourUnits?.catalog?.index;return !child&&(!runtime||runtime[input.dataset.compareUnit])}).length);
  expect(expectedLeaves).toBeGreaterThan(0);
  await selectAll.click();
+ await expect(count).toHaveText(String(expectedLeaves));
  const checkedLeaves=page.locator('#compare-unit-tree [data-compare-unit]:checked').filter({hasNot:page.locator('[data-derived-selected="true"]')});
  expect(await checkedLeaves.evaluateAll(inputs=>inputs.filter(input=>{const node=input.closest('.compare-unit-node');return ![...node.children].some(el=>el.classList.contains('compare-unit-children'))}).length)).toBe(expectedLeaves);
  const derived=page.locator('#compare-unit-tree [data-compare-unit][data-derived-selected="true"]:checked');expect(await derived.count()).toBeGreaterThan(0);
@@ -35,5 +37,5 @@ test('comparison dropdown actions reset metrics and select all non-overlapping l
  expect(hasActualOverlap).toBe(false);
  await reset.click();
  await expect(page.locator('#compare-unit-tree [data-compare-unit]:checked')).toHaveCount(0);
- await expect(page.locator('#compare-unit-count')).toHaveText('0 обр.');
+ await expect(count).toHaveText('0');
 });
