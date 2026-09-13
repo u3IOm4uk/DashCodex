@@ -19,9 +19,13 @@ const selectedUnits=new Set(),expandedUnits=new Set(),openCategories=new Set();
 const dayStamp=day=>Date.parse(day+'T12:00:00Z');
 const clamp=(value,min,max)=>value<min?min:value>max?max:value;
 const daysBetween=(from,to)=>{const rows=[];for(let day=from;day<=to;day=D.shift(day,1))rows.push(day);return rows};
-const mobileComparison=()=>matchMedia('(max-width:650px)').matches;
+const mobileComparison=()=>{const nav=$('.mobile-nav');return !!nav&&root.getComputedStyle(nav).display!=='none'};
 const comparisonChartHeight=()=>matchMedia('(max-width:900px)').matches?420:480;
 function syncMobileDialogOffset(){const nav=$('.mobile-nav'),height=nav?.getBoundingClientRect().height||64;dialog.style.setProperty('--compare-mobile-nav-height',height+'px')}
+function syncMobileNavState(active){
+ if(!mobileButton)return;const overview=$('#mobile-overview');mobileButton.classList.toggle('active',active);
+ if(active){overview?.classList.remove('active');mobileButton.setAttribute('aria-current','page')}else{mobileButton.removeAttribute('aria-current');overview?.classList.add('active')}
+}
 
 function setCompareView(next,rerender=true){
  const target=next==='details'?'details':'chart',changed=activeView!==target;activeView=target;
@@ -117,7 +121,6 @@ async function ensureModel(){
 
 function setLoading(text){$('#compare-status').textContent=text;$('#compare-status').hidden=false}
 function setMessage(text=''){const node=$('#compare-selection-note');node.textContent=text;node.hidden=!text}
-
 function renderShell(){
  if(!model)return;ensureCompareAccordion();
  $('#compare-source-note').textContent=`Джерело: ${sourceName}${sourceKind===C.APP_CONFIG.sourceKinds.BUNDLED?' · тестова книга':' · імпортована книга'}`;
@@ -273,16 +276,16 @@ function applyRange(nextFrom,nextTo){
 async function openComparison(){
  if(dialog.open)return;activeView='chart';ensureCompareAccordion();setCompareView('chart',false);
  if(mobileComparison()){
-  syncMobileDialogOffset();dialog.classList.add('compare-mobile-nav');dialog.show();
+  syncMobileDialogOffset();syncMobileNavState(true);dialog.classList.add('compare-mobile-nav');dialog.show();
  }else{
-  dialog.classList.remove('compare-mobile-nav');dialog.style.removeProperty('--compare-mobile-nav-height');dialog.showModal();
+  syncMobileNavState(false);dialog.classList.remove('compare-mobile-nav');dialog.style.removeProperty('--compare-mobile-nav-height');dialog.showModal();
  }
  try{await ensureModel();renderShell()}catch(error){console.error(error);setLoading('Не вдалося підключити дані для порівняння. Імпортуйте Excel або повторіть спробу.')}
 }
 button.addEventListener('click',openComparison);mobileButton?.addEventListener('click',openComparison);
 dialog.querySelector('[data-compare-close]').addEventListener('click',()=>dialog.close());
 dialog.addEventListener('click',event=>{if(!dialog.classList.contains('compare-mobile-nav')&&event.target===dialog){const box=dialog.getBoundingClientRect();if(event.clientX<box.left||event.clientX>box.right||event.clientY<box.top||event.clientY>box.bottom)dialog.close()}});
-dialog.addEventListener('close',()=>{chart?.destroy();chart=null;dialog.classList.remove('compare-mobile-nav');dialog.style.removeProperty('--compare-mobile-nav-height')});
+dialog.addEventListener('close',()=>{chart?.destroy();chart=null;syncMobileNavState(false);dialog.classList.remove('compare-mobile-nav');dialog.style.removeProperty('--compare-mobile-nav-height')});
 ['#mobile-overview','#mobile-menu'].forEach(selector=>$(selector)?.addEventListener('click',()=>{if(dialog.open&&dialog.classList.contains('compare-mobile-nav'))dialog.close()},true));
 addEventListener('resize',()=>{if(dialog.open&&dialog.classList.contains('compare-mobile-nav'))syncMobileDialogOffset()});
 
