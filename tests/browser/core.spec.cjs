@@ -18,3 +18,30 @@ test('core dashboard flow',async({page})=>{
  await expect(page.locator('#distribution-legend')).toBeVisible();
  await expect(page.locator('#table-body')).toBeVisible();
 });
+
+test('mobile category stepper stays above navigation and previews target categories',async({page})=>{
+ await page.setViewportSize({width:390,height:844});
+ await openDashboard(page);
+ const cards=page.locator('#metrics .metric-card');
+ const info=await cards.evaluateAll(nodes=>nodes.map(node=>({
+  id:node.dataset.metric,
+  name:node.querySelector('.metric-top')?.textContent.trim()||'',
+  active:node.getAttribute('aria-pressed')==='true'
+ })));
+ const activeIndex=info.findIndex(item=>item.active);
+ expect(activeIndex).toBeGreaterThanOrEqual(0);
+ const previousTarget=info[(activeIndex-1+info.length)%info.length],nextTarget=info[(activeIndex+1)%info.length];
+ const previous=page.locator('#previous'),next=page.locator('#next'),nav=page.locator('.mobile-nav');
+ await expect(previous).toHaveAttribute('data-target-label',previousTarget.name);
+ await expect(next).toHaveAttribute('data-target-label',nextTarget.name);
+ await expect(previous).toHaveAttribute('aria-label',`Попередня категорія: ${previousTarget.name}`);
+ await expect(next).toHaveAttribute('aria-label',`Наступна категорія: ${nextTarget.name}`);
+ const [previousBox,nextBox,navBox]=await Promise.all([previous.boundingBox(),next.boundingBox(),nav.boundingBox()]);
+ expect(Math.abs(previousBox.y+previousBox.height-navBox.y)).toBeLessThanOrEqual(1);
+ expect(Math.abs(nextBox.y+nextBox.height-navBox.y)).toBeLessThanOrEqual(1);
+ expect(await previous.evaluate(el=>getComputedStyle(el).position)).toBe('fixed');
+ await next.click();
+ await expect(page.locator(`#metrics [data-metric="${nextTarget.id}"]`)).toHaveAttribute('aria-pressed','true');
+ const nextNext=info[(activeIndex+2)%info.length];
+ await expect(next).toHaveAttribute('data-target-label',nextNext.name);
+});
