@@ -16,7 +16,8 @@ const paths={
 };
 
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const fmt=v=>v===null||v===undefined?'—':new Intl.NumberFormat('uk-UA',{maximumFractionDigits:2}).format(v);
+const numberFormat=new Intl.NumberFormat('uk-UA',{maximumFractionDigits:2});
+const fmt=v=>v===null||v===undefined?'—':numberFormat.format(v);
 const shortDate=d=>d?d.slice(8)+'.'+d.slice(5,7):'—';
 const fullDate=d=>d?shortDate(d)+'.'+d.slice(0,4):'—';
 const icon=n=>`<svg class="icon" aria-hidden="true" viewBox="0 0 24 24"><path d="${paths[n]||paths.grid}"/></svg>`;

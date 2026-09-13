@@ -6,7 +6,7 @@
 
 | Компонент | Відповідальність |
 |---|---|
-| `index.html` | Чинний DOM, доступні назви, підключення ресурсів, діалоги, шапка, dock і панелі |
+| `index.html` | DOM, ресурси й діалоги; без inline comparison handlers |
 | `js/contour-config.js` | `APP_CONFIG`, `WORKBOOK_SCHEMA`, `UNIT_HIERARCHY`, source/date/performance policy |
 | `js/contour-data.js` | Workbook validation, parse/normalization, metadata, indexes/cache, aggregate, dates і comparisons |
 | `js/contour-units.js` | Проєкція explicit hierarchy config на GOCh rows, unit statuses, archive/expand behavior |
@@ -14,13 +14,14 @@
 | `js/contour-charts.js` | Pure ApexCharts option builders і mini-bar SVG |
 | `js/contour-navigation.js` | Targeted navigation adapter для category/sticky scroll behavior |
 | `js/contour.js` | Runtime state, import/export, DOM orchestration, dialogs, chart lifecycle, основний render |
-| `js/contour-compare.js` | Незалежний UI/runtime конструктора міжкатегорійного порівняння поверх чинних `ContourData.parse()` / `aggregate()` |
+| `js/contour-compare.js` | Незалежний UI/state порівняння поверх прийнятої моделі та `aggregate()` |
+| `js/contour-source.js` | Прийняття джерела, один parse, захист від застарілого асинхронного читання |
 | `css/contour.css` | Базова тема, компоненти, адаптивність |
 | `css/contour-detail.css` | Парні показники й типи БпС |
 | `css/contour-refinement.css` | Чинні уточнення sticky/navigation/щільності |
 | `css/contour-units.css` | Ієрархічна таблиця, archive/status manager |
 | `css/contour-compare.css` | Трипанельний desktop layout та mobile picker/layout конструктора порівняння |
-| `js/xlsx.full.min.js`, `js/apexcharts.js` | Локальні SheetJS та ApexCharts |
+| `js/xlsx.full.min.js`, `js/apexcharts.js` | Локальні SheetJS 0.20.3 та ApexCharts 5.15.2 |
 | `.audit/` | Data/regression checks і workbook profiling |
 | `tests/browser/` | Change-scoped Playwright scenarios |
 | `Запустити.cmd` | Переносимий Windows launcher локального HTTP-сервера |
@@ -31,7 +32,7 @@ Unit presentation-гілка після parse: **parsed GOCh records + `ContourC
 
 Comparison flow розділений після `aggregate()`:
 
-- **chart:** та сама локальна Excel-книга → `ContourData.parse()` → `ContourData.sections()` → каталог серій + `UNIT_HIERARCHY` → окремі `aggregate()` вибраних показників/unit-вузлів → optional explicit multi-unit composition → presentation-only `normalized/absolute` transform → ApexCharts;
+- **chart:** спільна прийнята модель `ContourSource` → `ContourData.sections()` → каталог серій + `UNIT_HIERARCHY` → окремі `aggregate()` вибраних показників/unit-вузлів → optional explicit multi-unit composition → presentation-only `normalized/absolute` transform → ApexCharts;
 - **table:** ті самі raw `aggregate()` серії → абсолютні значення без presentation normalization → поденна деталізація; при unit scope — окремі `date × unit` rows, а не composite chart series.
 
 Конструктор не вводить власних source-полів і не реконструює parent із children.
@@ -66,9 +67,9 @@ Parent-зв’язки не виводяться з Excel. `buildCatalog()` зі
 2. вузли, присутні у GOCh і конфігурації, отримують тільки configured parent та level;
 3. Excel row order, шаблон `АК` та інші heuristics не використовуються для parent;
 4. назва, відсутня в `UNIT_HIERARCHY`, стає `unconfigured` root і явно позначається у UI;
-5. для bundled контрольної книги `units.spec.cjs` вимагає порожній `catalog.unconfigured`.
+5. `units.spec.cjs` перевіряє синтетичну ієрархію/невизначений вузол; вимоги порожнього bundled `catalog.unconfigured` у ньому немає. Фактичне охоплення — CURRENT_STATE / аудит A06.
 
-Ієрархія впливає тільки на представлення flat table. `+ / −` окремо керує expand/collapse, натискання назви викликає існуючі деталі. Батьківський numeric row не реконструюється з дітей.
+В основному огляді ієрархія керує представленням flat table та direct-child деталізацією. `+ / −` окремо керує expand/collapse, натискання назви викликає існуючі деталі. Батьківський numeric row не реконструюється з дітей.
 
 У comparison runtime `UNIT_HIERARCHY` індексується окремо лише для UI selection state. Вибір parent використовує його власний `aggregate(..., group)`. Вибір descendant прибирає ancestor зі scope, а вибір parent прибирає descendants; це не дозволяє подвійно врахувати один hierarchy path. Якщо явно обрано кілька неперекривних вузлів, їхні власні серії композиційно сумуються тільки для chart scope у `contour-compare.js`; день із хоча б одним `null` лишається `null`. Detail table натомість зберігає окремі raw series кожного вибраного вузла.
 
@@ -90,7 +91,7 @@ Runtime source metadata: `{kind,name}`. Filename не визначає bundled/u
 
 Data workbook після reload завантажується заново; unit visibility/archive preference є локальною persistence, а hierarchy source є статичною конфігурацією репозиторію.
 
-`contour-compare.js` не має доступу до closure основного `contour.js`, тому першу версію comparison runtime будує ліниво з тієї самої bundled книги або повторно парсить файл після File API import. Обидва runtime використовують один `ContourData` контракт і не розходяться у формулах; можливий read-only runtime bridge розглядається лише як майбутня оптимізація після profiling.
+`ContourSource.load(readBuffer, name, kind)` призначає generation до читання, відхиляє застарілий результат до parse та замінює `current` лише після успішної validation/parse. Помилка нового імпорту зберігає попередню модель. Основний runtime публікує прийнятий snapshot через `ContourUnits.setData()` і `ContourCompare.setSource()`. Comparison очікує `ready()` та використовує той самий model/cache без повторного fetch/parse. Новий імпорт скидає unit selection і дерева; звичайне відкриття comparison не змінює дерево огляду.
 
 ## Дати
 
@@ -111,7 +112,9 @@ Preset «Увесь період» може бути ширшим за manual UX
 
 `contour-compare.js` має окремий локальний state: parsed model/source metadata, metric catalog, selected series, comparison period, selected/expanded unit sets, opened metric categories, chart/value modes та chart instance. Цей state не змінює основні `from/to`, section/category або normalized records.
 
-`contour-view.js`/`contour-charts.js` pure; `contour-navigation.js` не володіє data model. `generation` у main render відсікає stale async chart completion.
+`contour-view.js`/`contour-charts.js` pure; форматування чисел повторно використовує один `Intl.NumberFormat`. `ContourNavigation.scrollCategory()` викликається явно з main і не перевизначає `window.scrollTo`. Основний та comparison render мають незалежні generation guards для застарілих chart completion/errors.
+
+Bulk/reset і derived parent checked/indeterminate state належать `contour-compare.js`: одна дія змінює Set і виконує один render. DOM не є джерелом аналітичного selection state; каскаду синтетичних change-подій та inline MutationObserver немає. Мобільні фільтри — нативні кнопки з aria-expanded/controls, закриті панелі inert; Escape повертає фокус. CSS визначає висоту chart host, workspace прокручується, а chart не стискається контейнером із прихованим overflow.
 
 ## Навігація і sticky
 
@@ -140,12 +143,13 @@ Comparison chart має власний ApexCharts lifecycle. Режим `normali
 
 ## Репозиторій і quality gate
 
-- `main` — verified baseline; значуща робота йде через branch/PR.
+- Значуща робота йде через branch/PR; статус конкретного `main` і реально проведені перевірки фіксуються в CURRENT_STATE. Сам workflow не підтверджує обов'язковість branch-protection checks.
 - `.github/workflows/quality.yml` аналізує diff через `scripts/quality-scope.cjs` і запускає тільки relevant jobs.
-- syntax — changed first-party JS only;
+- syntax — changed first-party JS та inline script у зміненому HTML;
 - regression — data/schema/aggregate risk;
 - resource-version — `index.html`/revision tooling;
-- browser specs: `core`, `sticky`, `charts`, `bps`, `units`.
+- browser specs: core/sticky/charts/bps/units і всі compare*.spec.cjs; перелік передається з router у workflow;
+- Змінений browser spec запускає себе; infrastructure diff знаходить усі browser specs. Router має unit coverage. `npm ci` використовує package-lock.json; portable `scripts/serve.cjs` обслуговує локальні Playwright перевірки.
 - `units.spec.cjs` запускається лише для hierarchy/archive-related risk; BpS spec не запускається лише через unit hierarchy changes.
 - stale runs одного PR cancel через `concurrency`.
 

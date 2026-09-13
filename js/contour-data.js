@@ -21,9 +21,26 @@ const personnel=[metric('personnel-total','Загальний облік',F.pers
 const clean=v=>String(v??'').trim().replace(/\s+/g,' ');
 const number=v=>typeof v==='number'&&Number.isFinite(v)?v:null;
 const sum=values=>!values.length||values.some(v=>v===null)?null:values.reduce((a,b)=>a+b,0);
-function date(v){if(v instanceof Date)return `${v.getFullYear()}-${String(v.getMonth()+1).padStart(2,'0')}-${String(v.getDate()).padStart(2,'0')}`;if(typeof v==='number')return new Date(Date.UTC(1899,11,30)+v*864e5).toISOString().slice(0,10);if(typeof v==='string'){if(/^\d{4}-\d{2}-\d{2}/.test(v))return v.slice(0,10);const m=v.match(/^(\d{2})[./](\d{2})[./](\d{4})$/);if(m)return `${m[3]}-${m[2]}-${m[1]}`}return null}
+function calendarDate(year,month,day){
+ if(year<1||year>9999||month<1||month>12||day<1||day>31)return null;
+ const check=new Date(0);check.setUTCFullYear(year,month-1,day);
+ return check.getUTCFullYear()===year&&check.getUTCMonth()===month-1&&check.getUTCDate()===day?`${String(year).padStart(4,'0')}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}`:null;
+}
+function date(value){
+ if(value instanceof Date)return Number.isFinite(value.getTime())?calendarDate(value.getFullYear(),value.getMonth()+1,value.getDate()):null;
+ if(typeof value==='number'){
+  const parsed=new Date(Date.UTC(1899,11,30)+value*864e5);
+  return Number.isFinite(parsed.getTime())?calendarDate(parsed.getUTCFullYear(),parsed.getUTCMonth()+1,parsed.getUTCDate()):null;
+ }
+ if(typeof value!=='string')return null;
+ const iso=value.match(/^(\d{4})-(\d{2})-(\d{2})(T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2}))?$/);
+ if(iso)return iso[4]&&!Number.isFinite(Date.parse(value))?null:calendarDate(+iso[1],+iso[2],+iso[3]);
+ const local=value.match(/^(\d{2})([./])(\d{2})\2(\d{4})$/);
+ return local?calendarDate(+local[4],+local[3],+local[1]):null;
+}
 const shift=(day,n)=>new Date(Date.parse(day+'T12:00:00Z')+n*864e5).toISOString().slice(0,10);
-function inclusiveDays(from,to){const a=Date.parse(from+'T12:00:00Z'),b=Date.parse(to+'T12:00:00Z');return Number.isFinite(a)&&Number.isFinite(b)&&b>=a?Math.floor((b-a)/864e5)+1:null}
+function inclusiveDays(from,to){if(date(from)!==from||date(to)!==to)return null;const a=Date.parse(from+'T12:00:00Z'),b=Date.parse(to+'T12:00:00Z');return Number.isFinite(a)&&Number.isFinite(b)&&b>=a?Math.floor((b-a)/864e5)+1:null}
+function alignDateRange(from,to,changedBoundary){if(from>to){if(changedBoundary==='to')from=to;else to=from}return {from,to}}
 function validateDateRange(from,to,maxDays=P.maxManualRangeDays){const days=inclusiveDays(from,to);if(days===null)return {valid:false,days:null,reason:'Некоректний діапазон дат.'};if(days>maxDays)return {valid:false,days,reason:`Оберіть період тривалістю до ${maxDays} днів.`};return {valid:true,days,reason:null}}
 const issue=(code,sheet,message)=>({code,sheet,message});
 const fieldList=group=>[...new Set(Object.values(group).flatMap(v=>Array.isArray(v)?v:[]))];
@@ -31,6 +48,13 @@ function validateWorkbook(wb,XLSX){
 const errors=[],warnings=[],rawSheets={};
 if(!wb||!Array.isArray(wb.SheetNames)||!wb.SheetNames.length||!wb.Sheets){errors.push(issue('workbook-empty',null,'Книга Excel не містить доступних аркушів.'));return {valid:false,errors,warnings,rawSheets}}
 for(const name of wb.SheetNames){const sheet=wb.Sheets[name];if(!sheet)continue;rawSheets[name]=XLSX.utils.sheet_to_json(sheet,{header:1,defval:null,raw:true})}
+for(const name of Object.values(S.sheets)){
+ const rows=rawSheets[name]||[],start=name===S.sheets.ovgp?2:1;
+ for(let i=start;i<rows.length;i++){
+  const value=rows[i]?.[0];
+  if(value!==null&&value!==undefined&&value!==''&&!date(value))errors.push({...issue('invalid-date',name,`Аркуш «${name}», рядок ${i+1}: некоректна календарна дата.`),row:i+1});
+ }
+}
 const usable=S.acceptance.atLeastOne.filter(name=>{const raw=rawSheets[name]||[],start=name===S.sheets.ovgp?2:1;return raw.slice(start).some(row=>date(row?.[0]))});
 if(!usable.length)errors.push(issue('required-data',null,'У книзі немає заповненого аркуша «ГОЧ» або «ОВгП».'));
 const ops=rawSheets[S.sheets.ops];if(ops?.length){const headers=(ops[0]||[]).map(clean);if(headers.length<2)errors.push(issue('ops-structure',S.sheets.ops,'Аркуш «ГОЧ» не містить очікуваних колонок дати та угруповання.'));const records=ops.slice(1).filter(row=>date(row?.[0]));if(records.length&&!records.some(row=>clean(row?.[1])===S.rows.opsSummary))errors.push(issue('ops-summary',S.sheets.ops,`Не знайдено підсумковий рядок «${S.rows.opsSummary}».`));const expected=[...fieldList(F.ops),...droneTypes.map(t=>t.field)];const missing=expected.filter(field=>!headers.includes(field));if(missing.length)warnings.push(issue('ops-fields',S.sheets.ops,`Не знайдено поля: ${missing.join(', ')}.`))}
@@ -77,5 +101,5 @@ return {from:start,to:end};
 function change(value,previous,complete=true){if(!complete||value===null||previous===null)return {delta:null,percent:null};return {delta:value-previous,percent:previous===0?(value===0?0:null):(value-previous)/Math.abs(previous)*100}}
 function axisRange(values,includeZero=false){const finite=values.filter(v=>typeof v==='number'&&Number.isFinite(v));if(!finite.length)return {min:0,max:1};let lo=Math.min(...finite),hi=Math.max(...finite);if(includeZero){lo=Math.min(0,lo);hi=Math.max(0,hi)}const pad=(hi-lo)*.12||Math.max(Math.abs(hi)*.05,1);return {min:lo>=0?Math.max(0,lo-pad):lo-pad,max:hi+pad}}
 function integerAxis(values,includeZero=false){const range=axisRange(values,includeZero),rough=Math.max(1,(range.max-range.min)/4),power=10**Math.floor(Math.log10(rough)),step=[1,2,5,10].find(n=>n*power>=rough)*power,min=Math.floor(range.min/step)*step,max=Math.ceil(range.max/step)*step;return {min,max:max>min?max:min+step,tickAmount:Math.max(1,Math.round((max-min)/step))}}
-root.ContourData={config:C,colors,operational,comparative,droneTypes,clean,number,sum,date,shift,inclusiveDays,validateDateRange,validateWorkbook,parse,sections,values,aggregate,clearPerformanceCaches,performanceStats,contextRange,change,axisRange,integerAxis};if(typeof module!=='undefined')module.exports=root.ContourData;
+root.ContourData={config:C,colors,operational,comparative,droneTypes,clean,number,sum,date,shift,inclusiveDays,alignDateRange,validateDateRange,validateWorkbook,parse,sections,values,aggregate,clearPerformanceCaches,performanceStats,contextRange,change,axisRange,integerAxis};if(typeof module!=='undefined')module.exports=root.ContourData;
 })(typeof window!=='undefined'?window:globalThis);

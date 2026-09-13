@@ -1,7 +1,7 @@
 (function(root){
 'use strict';
 
-const D=root.ContourData,C=root.ContourConfig,V=root.ContourView,H=root.ContourCharts;
+const D=root.ContourData,C=root.ContourConfig,V=root.ContourView,H=root.ContourCharts,S=root.ContourSource;
 if(!D||!C||!V||!H||!root.ApexCharts)return;
 const $=selector=>document.querySelector(selector);
 const {esc,fmt,fullDate,shortDate}=V;
@@ -11,6 +11,8 @@ const DEFAULT_SELECTION=['ops:shells:0','ops:assault:1','ops:drones:fpv'];
 const button=$('#compare-open'),mobileButton=$('#mobile-compare'),dialog=$('#compare-dialog');
 if(!button||!dialog)return;
 
+let acceptedSource=null,chartGeneration=0,activeFilter=null;
+const seriesColors=new Map();
 let model=null,sourceName=C.APP_CONFIG.defaultWorkbook,sourceKind=C.APP_CONFIG.sourceKinds.BUNDLED;
 let catalog=[],selected=new Set(DEFAULT_SELECTION),chart=null,chartType='area',valueMode='normalized',activeView='chart';
 let range={from:null,to:null},bounds={from:null,to:null};
@@ -20,7 +22,7 @@ const dayStamp=day=>Date.parse(day+'T12:00:00Z');
 const clamp=(value,min,max)=>value<min?min:value>max?max:value;
 const daysBetween=(from,to)=>{const rows=[];for(let day=from;day<=to;day=D.shift(day,1))rows.push(day);return rows};
 const mobileComparison=()=>{const nav=$('.mobile-nav');return !!nav&&root.getComputedStyle(nav).display!=='none'};
-const comparisonChartHeight=()=>matchMedia('(max-width:900px)').matches?420:480;
+const comparisonChartHeight=()=>Math.round($('#compare-chart').getBoundingClientRect().height)||360;
 function syncMobileDialogOffset(){const nav=$('.mobile-nav'),height=nav?.getBoundingClientRect().height||64;dialog.style.setProperty('--compare-mobile-nav-height',height+'px')}
 function syncMobileNavState(active){
  if(!mobileButton)return;const overview=$('#mobile-overview');mobileButton.classList.toggle('active',active);
@@ -34,7 +36,7 @@ function setCompareView(next,rerender=true){
  tablePanel?.classList.toggle('is-collapsed',activeView!=='details');
  chartHeading?.setAttribute('aria-expanded',String(activeView==='chart'));
  tableHeading?.setAttribute('aria-expanded',String(activeView==='details'));
- if(activeView==='details'&&chart){chart.destroy();chart=null;const host=$('#compare-chart');if(host)host.innerHTML=''}
+ if(activeView==='details'&&chart)disposeChart();
  if(rerender&&changed&&activeView==='chart'&&model&&range.from&&range.to)renderAnalysis();
 }
 
@@ -63,7 +65,9 @@ const unitMeta=new Map();
 function indexUnits(nodes,parent=null,depth=0){for(const node of nodes||[]){unitMeta.set(node.name,{node,parent,depth});indexUnits(node.children,node.name,depth+1)}}
 indexUnits(C.UNIT_HIERARCHY);
 function descendantNames(name,out=[]){const meta=unitMeta.get(name);for(const child of meta?.node.children||[]){out.push(child.name);descendantNames(child.name,out)}return out}
-function directChildNames(name){const runtime=root.ContourUnits?.catalog?.index?.[name]?.children;if(Array.isArray(runtime))return [...runtime];return (unitMeta.get(name)?.node.children||[]).map(child=>child.name)}
+function availableUnit(name){return !!root.ContourUnits?.catalog?.index?.[name]}
+function directChildNames(name){return (unitMeta.get(name)?.node.children||[]).map(child=>child.name).filter(availableUnit)}
+function leafNames(name){return [name,...descendantNames(name)].filter(child=>!unitMeta.get(child)?.node.children?.length&&availableUnit(child))}
 function ancestorNames(name){const out=[];let parent=unitMeta.get(name)?.parent;while(parent){out.push(parent);parent=unitMeta.get(parent)?.parent}return out}
 
 function modelBounds(){
@@ -103,26 +107,24 @@ function buildCatalog(){
  if(!selected.size){for(const id of DEFAULT_SELECTION)if(ids.has(id)&&selected.size<3)selected.add(id);for(const item of catalog)if(selected.size<3)selected.add(item.id)}
 }
 
-function setModel(next,name,kind){
- model=next;sourceName=name||C.APP_CONFIG.defaultWorkbook;sourceKind=kind;bounds=modelBounds();buildCatalog();range=initialRange();renderShell();
-}
-
-async function parseBuffer(buffer,name,kind){
- const workbook=XLSX.read(buffer,{type:'array',cellDates:true,cellText:false});
- setModel(D.parse(workbook,XLSX),name,kind);
+function setSource(next){
+ if(!next||acceptedSource===next)return;
+ acceptedSource=next;model=next.data;sourceName=next.source.name;sourceKind=next.source.kind;
+ selectedUnits.clear();expandedUnits.clear();bounds=modelBounds();buildCatalog();range=initialRange();
+ if(dialog.open)renderShell();
 }
 
 async function ensureModel(){
- if(model)return;
- setLoading('Завантаження даних для порівняння…');
- const response=await fetch(encodeURI(C.APP_CONFIG.defaultWorkbook));if(!response.ok)throw new Error('Файл недоступний');
- await parseBuffer(await response.arrayBuffer(),C.APP_CONFIG.defaultWorkbook,C.APP_CONFIG.sourceKinds.BUNDLED);
+ const next=await S.ready();
+ if(!next)throw new Error('Немає прийнятої книги');
+ // Main publishes after accepting the source; this covers opening before initial load finishes.
+ if(acceptedSource!==next){acceptedSource=next;model=next.data;sourceName=next.source.name;sourceKind=next.source.kind;bounds=modelBounds();buildCatalog();range=initialRange()}
 }
 
 function setLoading(text){$('#compare-status').textContent=text;$('#compare-status').hidden=false}
 function setMessage(text=''){const node=$('#compare-selection-note');node.textContent=text;node.hidden=!text}
 function renderShell(){
- if(!model)return;ensureCompareAccordion();
+ if(!model||!dialog.open)return;ensureCompareAccordion();
  $('#compare-source-note').textContent=`Джерело: ${sourceName}${sourceKind===C.APP_CONFIG.sourceKinds.BUNDLED?' · тестова книга':' · імпортована книга'}`;
  const from=$('#compare-from'),to=$('#compare-to');from.min=to.min=bounds.from;from.max=to.max=bounds.to;from.value=range.from;to.value=range.to;
  renderCatalog();renderUnitTree();syncButtons();renderAnalysis();
@@ -141,30 +143,34 @@ function renderCatalog(){
  host.querySelectorAll('[data-compare-metric]').forEach(input=>input.addEventListener('change',()=>{
   const id=input.dataset.compareMetric;
   if(input.checked){if(selected.size>=MAX_SERIES){input.checked=false;setMessage(`Одночасно можна відобразити до ${MAX_SERIES} показників.`);return}selected.add(id)}else selected.delete(id);
-  setMessage(selected.size?`Обрано ${selected.size} показник${selected.size===1?'':selected.size<5?'и':'ів'}.`:'Оберіть хоча б один показник.');renderCatalog();renderAnalysis();
+  setMessage(selected.size?`Обрано ${selected.size} показник${selected.size===1?'':selected.size<5?'и':'ів'}.`:'Оберіть хоча б один показник.');renderCatalog();renderAnalysis();restoreControl('data-compare-metric',id);
  }));
 }
 
 function unitNodeHtml(node,depth=0){
- const children=node.children||[],hasChildren=children.length>0,expanded=expandedUnits.has(node.name),checked=selectedUnits.has(node.name);
- return `<div class="compare-unit-node" style="--unit-depth:${depth}"><div class="compare-unit-row">${hasChildren?`<button type="button" class="compare-unit-toggle" data-unit-toggle="${esc(node.name)}" aria-label="${expanded?'Згорнути':'Розгорнути'} ${esc(node.name)}" aria-expanded="${expanded}">${expanded?'⌄':'›'}</button>`:'<span class="compare-unit-toggle-spacer"></span>'}<label><input type="checkbox" data-compare-unit="${esc(node.name)}" ${checked?'checked':''}><span>${esc(node.name)}</span></label></div>${hasChildren?`<div class="compare-unit-children" ${expanded?'':'hidden'}>${children.map(child=>unitNodeHtml(child,depth+1)).join('')}</div>`:''}</div>`;
+ const children=node.children||[],hasChildren=children.length>0,expanded=expandedUnits.has(node.name),leaves=leafNames(node.name),derived=!selectedUnits.has(node.name)&&hasChildren&&leaves.length>0&&leaves.every(name=>selectedUnits.has(name)),checked=selectedUnits.has(node.name)||derived;
+ return `<div class="compare-unit-node" style="--unit-depth:${depth}"><div class="compare-unit-row">${hasChildren?`<button type="button" class="compare-unit-toggle" data-unit-toggle="${esc(node.name)}" aria-label="${expanded?'Згорнути':'Розгорнути'} ${esc(node.name)}" aria-expanded="${expanded}">${expanded?'⌄':'›'}</button>`:'<span class="compare-unit-toggle-spacer"></span>'}<label><input type="checkbox" data-compare-unit="${esc(node.name)}" ${derived?'data-derived-selected="true"':''} ${!availableUnit(node.name)?'disabled':''} ${checked?'checked':''}><span>${esc(node.name)}</span></label></div>${hasChildren?`<div class="compare-unit-children" ${expanded?'':'hidden'}>${children.map(child=>unitNodeHtml(child,depth+1)).join('')}</div>`:''}</div>`;
 }
 
 function renderUnitTree(){
  const host=$('#compare-unit-tree');host.innerHTML=C.UNIT_HIERARCHY.map(node=>unitNodeHtml(node)).join('');
- const all=$('#compare-units-all'),count=$('#compare-unit-count');all.setAttribute('aria-pressed',String(selectedUnits.size===0));all.classList.toggle('is-active',selectedUnits.size===0);count.textContent=selectedUnits.size?`${selectedUnits.size} обр.`:'Усі';
- host.querySelectorAll('[data-unit-toggle]').forEach(control=>control.addEventListener('click',()=>{const name=control.dataset.unitToggle;if(expandedUnits.has(name))expandedUnits.delete(name);else expandedUnits.add(name);renderUnitTree()}));
+ const all=$('#compare-units-all'),count=$('#compare-unit-count');all.setAttribute('aria-pressed',String(selectedUnits.size===0));all.classList.toggle('is-active',selectedUnits.size===0);count.textContent=String(selectedUnits.size);
+ host.querySelectorAll('[data-unit-toggle]').forEach(control=>control.addEventListener('click',()=>{const name=control.dataset.unitToggle;if(expandedUnits.has(name))expandedUnits.delete(name);else expandedUnits.add(name);renderUnitTree();restoreControl('data-unit-toggle',name)}));
+ host.querySelectorAll('[data-compare-unit]').forEach(input=>{input.indeterminate=!input.checked&&descendantNames(input.dataset.compareUnit).some(name=>selectedUnits.has(name));input.setAttribute('aria-checked',input.indeterminate?'mixed':String(input.checked))});
  host.querySelectorAll('[data-compare-unit]').forEach(input=>input.addEventListener('change',()=>{
   const name=input.dataset.compareUnit;
-  if(input.checked){
+  if(input.dataset.derivedSelected==='true'){for(const leaf of leafNames(name))selectedUnits.delete(leaf)}else if(input.checked){
    for(const ancestor of ancestorNames(name))selectedUnits.delete(ancestor);
    for(const descendant of descendantNames(name))selectedUnits.delete(descendant);
    selectedUnits.add(name);if(unitMeta.get(name)?.node.children?.length)expandedUnits.add(name);
   }else selectedUnits.delete(name);
-  renderUnitTree();renderAnalysis();
+  renderUnitTree();renderAnalysis();restoreControl('data-compare-unit',name);
  }));
 }
 
+function restoreControl(attribute,value){const control=[...dialog.querySelectorAll('['+attribute+']')].find(node=>node.getAttribute(attribute)===value);control?.focus({preventScroll:true})}
+$('#compare-units-select-all').addEventListener('click',()=>{selectedUnits.clear();for(const node of C.UNIT_HIERARCHY)for(const leaf of leafNames(node.name))selectedUnits.add(leaf);renderUnitTree();renderAnalysis()});
+$('#compare-metrics-reset').addEventListener('click',()=>{selected.clear();renderCatalog();renderAnalysis()});
 $('#compare-units-all')?.addEventListener('click',()=>{selectedUnits.clear();renderUnitTree();renderAnalysis()});
 
 function syncButtons(){
@@ -179,7 +185,7 @@ function normalized(values){
 }
 
 function selectedItems(){const map=new Map(catalog.map(item=>[item.id,item]));return [...selected].map(id=>map.get(id)).filter(Boolean)}
-function unitScopeLabel(){const names=[...selectedUnits];if(!names.length)return 'Загальний підсумок';if(names.length<=2)return names.join(' + ');return `Обрано підрозділів: ${names.length}`}
+function unitScopeLabel(){const names=[...selectedUnits];if(!names.length)return 'Загальний підсумок';if(names.length===1)return names[0]+' · власний рядок';return `Сума ${names.length} вибраних вузлів`}
 function sourceSeries(item,days,unit){const aggregate=D.aggregate(model,item.section,item.category,range.from,range.to,unit);return aggregate.series[item.index]||days.map(()=>null)}
 function rawForItem(item,days){
  if(!item.supportsUnit||!selectedUnits.size)return sourceSeries(item,days);
@@ -190,10 +196,13 @@ function rawForItem(item,days){
 
 function analysisRows(){
  const days=daysBetween(range.from,range.to),items=selectedItems();let unavailable=0,missing=0;
- const series=items.map((item,colorIndex)=>{
+ for(const id of seriesColors.keys())if(!selected.has(id))seriesColors.delete(id);
+ const usedColors=new Set(items.filter(item=>seriesColors.has(item.id)).map(item=>seriesColors.get(item.id)));
+ const series=items.map(item=>{
+  if(!seriesColors.has(item.id)){const color=SERIES_COLORS.find(color=>!usedColors.has(color))||SERIES_COLORS[0];seriesColors.set(item.id,color);usedColors.add(color)}
   const raw=rawForItem(item,days);missing+=raw.filter(value=>value===null).length;
   const transformed=valueMode==='normalized'?normalized(raw):{values:raw,baseline:null};if(valueMode==='normalized'&&transformed.baseline===null)unavailable++;
-  return {item,color:SERIES_COLORS[colorIndex%SERIES_COLORS.length],raw,values:transformed.values,baseline:transformed.baseline};
+  return {item,color:seriesColors.get(item.id),raw,values:transformed.values,baseline:transformed.baseline,baselineDay:transformed.baseline===null?null:days[raw.findIndex(value=>value!==null&&value!==0)]};
  });
  return {days,series,unavailable,missing};
 }
@@ -201,7 +210,7 @@ function analysisRows(){
 function chartOptions(rows){
  const base=H.baseOptions(matchMedia('(prefers-reduced-motion: reduce)').matches),all=rows.series.flatMap(series=>series.values.filter(value=>value!==null));
  const limits=valueMode==='normalized'?D.axisRange(all):D.integerAxis(all,false);
- return {...base,chart:{...base.chart,type:chartType,height:comparisonChartHeight(),zoom:{enabled:false}},series:rows.series.map(series=>({name:series.item.categoryName===series.item.name?series.item.name:`${series.item.categoryName} · ${series.item.name}`,data:rows.days.map((day,index)=>({x:dayStamp(day),y:series.values[index]}))})),colors:rows.series.map(series=>series.color),stroke:{...base.stroke,width:chartType==='area'?2.2:0},fill:chartType==='area'?{type:'gradient',gradient:{opacityFrom:.24,opacityTo:.02}}:{type:'solid',opacity:.9},plotOptions:{bar:{columnWidth:'62%',borderRadius:2}},xaxis:{type:'datetime',labels:{datetimeUTC:true,formatter:(value,stamp)=>shortDate(new Date(stamp).toISOString().slice(0,10))},axisBorder:{show:false},axisTicks:{show:false},tooltip:{enabled:false}},yaxis:{...limits,forceNiceScale:false,labels:{formatter:value=>valueMode==='normalized'?`${Math.round(value)}`:fmt(Math.round(value))},title:{text:valueMode==='normalized'?'Індекс, база = 100':'Абсолютне значення'}},tooltip:{theme:'dark',shared:true,intersect:false,x:{formatter:stamp=>fullDate(new Date(stamp).toISOString().slice(0,10))},y:{formatter:value=>value===null||value===undefined?'—':valueMode==='normalized'?`${fmt(Math.round(value*10)/10)} інд.`:fmt(value)}},legend:{...base.legend,onItemClick:{toggleDataSeries:true}}};
+ return {...base,annotations:valueMode==='normalized'?{yaxis:[{y:100,borderColor:'#839499',strokeDashArray:4,label:{text:'База 100',style:{color:'#dce5e5',background:'#283234'}}}]}:{yaxis:[]},chart:{...base.chart,type:chartType,height:comparisonChartHeight(),zoom:{enabled:false}},series:rows.series.map(series=>({name:series.item.categoryName===series.item.name?series.item.name:`${series.item.categoryName} · ${series.item.name}`,data:rows.days.map((day,index)=>({x:dayStamp(day),y:series.values[index]}))})),colors:rows.series.map(series=>series.color),stroke:{...base.stroke,width:chartType==='area'?2.2:0},fill:chartType==='area'?{type:'gradient',gradient:{opacityFrom:.24,opacityTo:.02}}:{type:'solid',opacity:.9},plotOptions:{bar:{columnWidth:'62%',borderRadius:2}},xaxis:{type:'datetime',labels:{datetimeUTC:true,formatter:(value,stamp)=>shortDate(new Date(stamp).toISOString().slice(0,10))},axisBorder:{show:false},axisTicks:{show:false},tooltip:{enabled:false}},yaxis:{...limits,forceNiceScale:false,labels:{formatter:value=>valueMode==='normalized'?`${Math.round(value)}`:fmt(Math.round(value))},title:{text:valueMode==='normalized'?'Індекс, база = 100':'Абсолютне значення'}},tooltip:{theme:'dark',shared:true,intersect:false,x:{formatter:stamp=>fullDate(new Date(stamp).toISOString().slice(0,10))},y:{formatter:(value,context)=>{if(value===null||value===undefined)return '—';const series=rows.series[context.seriesIndex],raw=series?.raw[context.dataPointIndex];return valueMode==='normalized'?`${fmt(Math.round(value*10)/10)} інд. · ${fmt(raw)} ${series?.item.unit||'од.'}`:fmt(value)}}},legend:{...base.legend,onItemClick:{toggleDataSeries:true}}};
 }
 
 function tableData(days,items){
@@ -246,15 +255,26 @@ function renderTable(rows){
  if(foot){const childNote=detail.childCount?` · + ${detail.childCount} безпосередніх дочірніх`:'';const globalNote=detail.showUnit&&items.some(item=>!item.supportsUnit)?' · глобальні показники окремим рядком':'';foot.textContent=`Абсолютні значення джерела · ${rows.days.length} дн. · ${items.length} показн.${detail.showUnit?` · ${selectedUnits.size} обр. підрозд.${childNote}`:''}${globalNote}`}
 }
 
+function renderSelection(rows){
+ let host=$('#compare-selection');
+ if(!host){host=document.createElement('div');host.id='compare-selection';host.className='compare-selection';host.setAttribute('aria-label','Вибрані серії');dialog.querySelector('.compare-toolbar').after(host)}
+ host.innerHTML=rows.series.map(series=>{const item=series.item,name=item.categoryName===item.name?item.name:item.categoryName+' · '+item.name;return `<div class="compare-series-chip" style="--series-color:${series.color}"><span class="compare-series-marker" aria-hidden="true"></span><div><strong>${esc(name)}</strong><small>${series.baselineDay?'База '+fullDate(series.baselineDay)+' · '+fmt(series.baseline)+' '+esc(item.unit||'од.'):(valueMode==='normalized'?'Немає ненульової бази':esc(item.unit||'од.'))}</small></div><button type="button" data-remove-series="${esc(item.id)}" aria-label="Вилучити ${esc(name)}">×</button></div>`}).join('');
+ host.querySelectorAll('[data-remove-series]').forEach(button=>button.addEventListener('click',()=>{selected.delete(button.dataset.removeSeries);renderCatalog();renderAnalysis();(host.querySelector('button')||$('#compare-mobile-metrics-toggle')).focus({preventScroll:true})}));
+ $('#compare-count-limit')?.remove();
+ if(selected.size===MAX_SERIES){const note=document.createElement('p');note.id='compare-count-limit';note.className='compare-limit';note.textContent='Обрано 6 із 6. Вилучіть серію, щоб додати іншу.';host.append(note)}
+}
+function disposeChart(){chartGeneration++;chart?.destroy();chart=null;$('#compare-chart').innerHTML=''}
+
 function renderAnalysis(){
  if(!model||!range.from||!range.to)return;ensureCompareAccordion();syncButtons();
  const items=selectedItems(),status=$('#compare-status');
- if(!items.length){chart?.destroy();chart=null;$('#compare-chart').innerHTML='';$('#compare-table-head').innerHTML='';$('#compare-table-body').innerHTML='';if($('#compare-table-foot'))$('#compare-table-foot').textContent='';if($('#compare-unit-breakdown-note'))$('#compare-unit-breakdown-note').hidden=true;status.hidden=false;status.textContent='Оберіть показники у блоці «Показники».';return}
+ if(!items.length){disposeChart();renderSelection({series:[]});$('#compare-data-note').textContent='';$('#compare-table-head').innerHTML='';$('#compare-table-body').innerHTML='';if($('#compare-table-foot'))$('#compare-table-foot').textContent='';if($('#compare-unit-breakdown-note'))$('#compare-unit-breakdown-note').hidden=true;status.hidden=false;status.textContent='Оберіть показники у блоці «Показники».';return}
  const validation=D.validateDateRange(range.from,range.to);if(!validation.valid){status.hidden=false;status.textContent=validation.reason;return}
  status.hidden=true;const rows=analysisRows();
- chart?.destroy();chart=null;$('#compare-chart').innerHTML='';
- if(activeView==='chart'){
-  try{chart=new ApexCharts($('#compare-chart'),chartOptions(rows));chart.render().catch(error=>{console.error(error);status.hidden=false;status.textContent='Не вдалося побудувати графік порівняння.'})}catch(error){console.error(error);status.hidden=false;status.textContent='Не вдалося побудувати графік порівняння.'}
+ disposeChart();renderSelection(rows);const own=chartGeneration;
+ if(activeView==='chart'&&dialog.open){
+  const failed=error=>{if(own!==chartGeneration||!dialog.open)return;console.error(error);status.hidden=false;status.textContent='Не вдалося побудувати графік порівняння.'};
+  try{chart=new ApexCharts($('#compare-chart'),chartOptions(rows));chart.render().catch(failed)}catch(error){failed(error)}
  }
  renderTable(rows);
  const notes=[];
@@ -268,29 +288,50 @@ function renderAnalysis(){
  $('#compare-range-note').textContent=`${fullDate(range.from)} — ${fullDate(range.to)} · ${items.length} показник${items.length===1?'':items.length<5?'и':'ів'} · ${unitScopeLabel()}`;
 }
 
-function applyRange(nextFrom,nextTo){
- if(!model)return;nextFrom=clamp(nextFrom,bounds.from,bounds.to);nextTo=clamp(nextTo,bounds.from,bounds.to);if(nextFrom>nextTo)[nextFrom,nextTo]=[nextTo,nextFrom];const validation=D.validateDateRange(nextFrom,nextTo);if(!validation.valid){setMessage(validation.reason);return}
- range={from:nextFrom,to:nextTo};$('#compare-from').value=range.from;$('#compare-to').value=range.to;renderAnalysis();
+function applyRange(nextFrom,nextTo,changedBoundary='from'){
+ if(!model)return;
+ const restore=()=>{$('#compare-from').value=range.from;$('#compare-to').value=range.to};
+ if(D.date(nextFrom)!==nextFrom||D.date(nextTo)!==nextTo){setMessage('Введіть коректні дати періоду.');restore();return}
+ const next=D.alignDateRange(clamp(nextFrom,bounds.from,bounds.to),clamp(nextTo,bounds.from,bounds.to),changedBoundary);
+ const validation=D.validateDateRange(next.from,next.to);
+ if(!validation.valid){setMessage(validation.reason);restore();return}
+ range=next;restore();setMessage('');renderAnalysis();
 }
 
+function setFilter(name,returnFocus=false){
+ const previous=activeFilter;activeFilter=name;
+ const bottom=dialog.querySelector('.compare-mobile-pickers').getBoundingClientRect().bottom;
+ if(bottom)dialog.style.setProperty('--compare-picker-bottom',bottom+'px');
+ for(const key of ['metrics','units']){
+  const open=key===name,panel=$('#compare-'+key+'-panel');
+  $('#compare-mobile-'+key+'-toggle').setAttribute('aria-expanded',String(open));
+  panel.classList.toggle('is-open',open);panel.inert=mobileComparison()&&!open;
+ }
+ if(returnFocus&&previous)$('#compare-mobile-'+previous+'-toggle').focus({preventScroll:true});
+}
+for(const name of ['metrics','units'])$('#compare-mobile-'+name+'-toggle').addEventListener('click',()=>setFilter(activeFilter===name?null:name));
+dialog.addEventListener('keydown',event=>{if(event.key==='Escape'&&activeFilter){event.preventDefault();event.stopPropagation();setFilter(null,true)}});
+dialog.addEventListener('click',event=>{if(activeFilter&&!event.target.closest('.compare-sidebar,.compare-mobile-pickers'))setFilter(null)});
+
 async function openComparison(){
- if(dialog.open)return;activeView='chart';ensureCompareAccordion();setCompareView('chart',false);
+ if(dialog.open)return;setFilter(null);activeView='chart';ensureCompareAccordion();setCompareView('chart',false);
  if(mobileComparison()){
-  syncMobileDialogOffset();syncMobileNavState(true);dialog.classList.add('compare-mobile-nav');dialog.show();
+  syncMobileDialogOffset();syncMobileNavState(true);dialog.classList.add('compare-mobile-nav');dialog.show();setFilter(null);
  }else{
   syncMobileNavState(false);dialog.classList.remove('compare-mobile-nav');dialog.style.removeProperty('--compare-mobile-nav-height');dialog.showModal();
  }
- try{await ensureModel();renderShell()}catch(error){console.error(error);setLoading('Не вдалося підключити дані для порівняння. Імпортуйте Excel або повторіть спробу.')}
+ try{await ensureModel();if(dialog.open)renderShell()}catch(error){console.error(error);setLoading('Не вдалося підключити дані для порівняння. Імпортуйте Excel або повторіть спробу.')}
 }
 button.addEventListener('click',openComparison);mobileButton?.addEventListener('click',openComparison);
 dialog.querySelector('[data-compare-close]').addEventListener('click',()=>dialog.close());
 dialog.addEventListener('click',event=>{if(!dialog.classList.contains('compare-mobile-nav')&&event.target===dialog){const box=dialog.getBoundingClientRect();if(event.clientX<box.left||event.clientX>box.right||event.clientY<box.top||event.clientY>box.bottom)dialog.close()}});
-dialog.addEventListener('close',()=>{chart?.destroy();chart=null;syncMobileNavState(false);dialog.classList.remove('compare-mobile-nav');dialog.style.removeProperty('--compare-mobile-nav-height')});
+dialog.addEventListener('close',()=>{disposeChart();setFilter(null);syncMobileNavState(false);dialog.classList.remove('compare-mobile-nav');dialog.style.removeProperty('--compare-mobile-nav-height')});
 ['#mobile-overview','#mobile-menu'].forEach(selector=>$(selector)?.addEventListener('click',()=>{if(dialog.open&&dialog.classList.contains('compare-mobile-nav'))dialog.close()},true));
-addEventListener('resize',()=>{if(dialog.open&&dialog.classList.contains('compare-mobile-nav'))syncMobileDialogOffset()});
+let resizeFrame=0;
+addEventListener('resize',()=>{cancelAnimationFrame(resizeFrame);resizeFrame=requestAnimationFrame(()=>{if(!dialog.open)return;if(dialog.classList.contains('compare-mobile-nav'))syncMobileDialogOffset();setFilter(activeFilter);if(model)renderAnalysis()})});
 
-$('#compare-from').addEventListener('change',()=>applyRange($('#compare-from').value,$('#compare-to').value));
-$('#compare-to').addEventListener('change',()=>applyRange($('#compare-from').value,$('#compare-to').value));
+$('#compare-from').addEventListener('change',()=>applyRange($('#compare-from').value,$('#compare-to').value,'from'));
+$('#compare-to').addEventListener('change',()=>applyRange($('#compare-from').value,$('#compare-to').value,'to'));
 dialog.querySelectorAll('[data-compare-days]').forEach(node=>node.addEventListener('click',()=>{
  if(!model)return;const days=Number(node.dataset.compareDays);applyRange(clamp(D.shift(range.to,-days+1),bounds.from,bounds.to),range.to);
 }));
@@ -298,11 +339,6 @@ $('#compare-dashboard-period').addEventListener('click',()=>{const from=$('#from
 dialog.querySelectorAll('[data-compare-chart]').forEach(node=>node.addEventListener('click',()=>{chartType=node.dataset.compareChart;renderAnalysis()}));
 dialog.querySelectorAll('[data-compare-mode]').forEach(node=>node.addEventListener('click',()=>{valueMode=node.dataset.compareMode;renderAnalysis()}));
 
-$('#file-input')?.addEventListener('change',async event=>{
- const file=event.target.files?.[0];if(!file||file.size>C.APP_CONFIG.maxImportBytes)return;
- try{await parseBuffer(await file.arrayBuffer(),file.name,C.APP_CONFIG.sourceKinds.USER)}catch(error){console.warn('Comparison model kept previous source:',error)}
-});
-
-root.ContourCompare={normalize:normalized,maxSeries:MAX_SERIES};
+root.ContourCompare={normalize:normalized,maxSeries:MAX_SERIES,setSource};
 if(typeof module!=='undefined')module.exports=root.ContourCompare;
 })(typeof window!=='undefined'?window:globalThis);

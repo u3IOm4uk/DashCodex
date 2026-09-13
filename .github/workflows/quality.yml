@@ -18,13 +18,11 @@ jobs:
     outputs:
       syntax: ${{ steps.scope.outputs.syntax }}
       syntax_files: ${{ steps.scope.outputs.syntax_files }}
+      inline_syntax: ${{ steps.scope.outputs.inline_syntax }}
       resource_version: ${{ steps.scope.outputs.resource_version }}
       regression: ${{ steps.scope.outputs.regression }}
-      browser_core: ${{ steps.scope.outputs.browser_core }}
-      browser_sticky: ${{ steps.scope.outputs.browser_sticky }}
-      browser_bps: ${{ steps.scope.outputs.browser_bps }}
-      browser_charts: ${{ steps.scope.outputs.browser_charts }}
-      browser_units: ${{ steps.scope.outputs.browser_units }}
+      browser: ${{ steps.scope.outputs.browser }}
+      browser_files: ${{ steps.scope.outputs.browser_files }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -63,6 +61,9 @@ jobs:
             echo "node --check $file"
             node --check "$file"
           done <<< "$FILES"
+      - name: Check inline JavaScript
+        if: needs.scope.outputs.inline_syntax == 'true'
+        run: node scripts/check-inline.cjs
 
   resource-version:
     needs: scope
@@ -87,10 +88,12 @@ jobs:
           node-version: 22
       - name: Data and aggregation regression
         run: node .audit/verify-contour.cjs
+      - name: Date, source and quality routing contracts
+        run: node --test tests/unit/*.test.cjs
 
   browser:
     needs: scope
-    if: needs.scope.outputs.browser_core == 'true' || needs.scope.outputs.browser_sticky == 'true' || needs.scope.outputs.browser_bps == 'true' || needs.scope.outputs.browser_charts == 'true' || needs.scope.outputs.browser_units == 'true'
+    if: needs.scope.outputs.browser == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -98,17 +101,14 @@ jobs:
         with:
           node-version: 22
       - name: Install test tooling
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
       - name: Run only browser tests relevant to this diff
+        env:
+          BROWSER_FILES: ${{ needs.scope.outputs.browser_files }}
         shell: bash
         run: |
-          files=()
-          [ "${{ needs.scope.outputs.browser_core }}" = "true" ] && files+=(tests/browser/core.spec.cjs)
-          [ "${{ needs.scope.outputs.browser_sticky }}" = "true" ] && files+=(tests/browser/sticky.spec.cjs)
-          [ "${{ needs.scope.outputs.browser_bps }}" = "true" ] && files+=(tests/browser/bps.spec.cjs)
-          [ "${{ needs.scope.outputs.browser_charts }}" = "true" ] && files+=(tests/browser/charts.spec.cjs)
-          [ "${{ needs.scope.outputs.browser_units }}" = "true" ] && files+=(tests/browser/units.spec.cjs)
+          mapfile -t files <<< "$BROWSER_FILES"
           printf 'Selected browser tests: %s\n' "${files[*]}"
           npx playwright test "${files[@]}"

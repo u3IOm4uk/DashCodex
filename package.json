@@ -3,6 +3,7 @@
   "private": true,
   "scripts": {
     "test:regression": "node .audit/verify-contour.cjs",
+    "test:unit": "node --test tests/unit/*.test.cjs",
     "test:browser": "playwright test",
     "version:check": "node scripts/resource-version.cjs --check",
     "version:bump": "node scripts/resource-version.cjs"

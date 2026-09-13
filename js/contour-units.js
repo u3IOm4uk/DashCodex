@@ -211,12 +211,7 @@ function bootDom(){
   if(typeof document==='undefined')return;ensureControls();ensureDialog();observeDetail();const body=document.querySelector('#table-body');if(!body)return;
   observer=new MutationObserver(()=>requestRefresh());observer.observe(body,{childList:true});requestRefresh();
 }
-function wrapParser(){
-  const D=root.ContourData;if(!D||D.__contourUnitsWrapped)return;
-  const original=D.parse;D.parse=function(...args){const parsed=original.apply(this,args);setData(parsed);return parsed};D.__contourUnitsWrapped=true;
-}
-
-wrapParser();if(typeof document!=='undefined')bootDom();
-const api={STATUS,STORAGE_KEY,buildCatalog,loadStatuses,statusOf,setStatus,get catalog(){return catalog},get data(){return data}};
+if(typeof document!=='undefined')bootDom();
+const api={STATUS,STORAGE_KEY,buildCatalog,loadStatuses,statusOf,setStatus,setData,get catalog(){return catalog},get data(){return data}};
 root.ContourUnits=api;if(typeof module!=='undefined')module.exports=api;
 })(typeof window!=='undefined'?window:globalThis);

@@ -1,22 +1,20 @@
 # Незавершені задачі
 
-Оновлено: 2026-09-13. Етапи 1–5 та конструктор міжкатегорійного порівняння інтегровані у `main`: базова інтеграція виконана через PR #11, останні UI-уточнення конструктора — через PR #12. Відкритий технічний борг наведено нижче.
+Оновлено: **2026-09-13**. A01–A08, R1/R2 і перший етап V1–V3 реалізовані в `fix/audit-analytics-presentation`; перевірки — [CURRENT_STATE](CURRENT_STATE.md). Початкові рекомендації — [аудит](AUDIT_2026-09-13.md).
 
-| ID / пріоритет | Задача | Статус / залежності | Критерій завершення |
-|---|---|---|---|
-| T05 / P3 | Прибрати підтверджені мертві CSS-селектори й упорядкувати каскад | Відкладено; робити під browser coverage | Менше obsolete overrides без layout-регресій |
-| T08 / P3 | Профілювання великої книги, Safari/Firefox і фізичні пристрої | Окремий profiling task | Є виміряні bottleneck-и та межі |
+## Погоджений етап
 
-## Quality policy
+- Перегляд реалізації користувачем; злиття лише за його наступною прямою командою.
 
-- docs-only → без runtime/browser tests;
-- змінений first-party JS → syntax лише змінених файлів;
-- data/schema/aggregate → adapter regression;
-- UI → core browser;
-- sticky/navigation → sticky browser;
-- charts → chart browser;
-- БпС/FPV → BpS browser;
-- hierarchy/archive → units browser;
-- test/CI infrastructure → повний quality suite.
+## Відкладені рекомендації
 
-Закрито у Stage 5: T17, T18 (PR #5 злитий). Stage 4: T13, T14, T16. Stage 3: T02, T03, T11, T12 (перший модульний поділ), T15. Stage 2: T04, T07, T09, T10. Stage 1: launcher/Git hygiene/legacy cleanup.
+| ID | Задача | Межі / залежність |
+|---|---|---|
+| T05 / R3 | Упорядкувати решту CSS cascade | Comparison уже має власний layout; інші шари потребують окремого diff та browser coverage |
+| R4 | Форматування й JSDoc-контракти first-party коду | Масове форматування відокремити від функціональних змін; number formatter і navigation wrapper уже опрацьовані |
+| R5 | Уніфікувати metric metadata між інструментами | Стабільність кольорів усередині comparison виконана; міжмодульна палітра/назви потребують окремої оцінки |
+| R6 | Vendor manifest/hash та оновлення tooling | Lockfile і npm ci виконані; Playwright/ApexCharts major upgrade лишається окремим етапом |
+| T08 | Великі книги, Safari/Firefox, фізичні пристрої | Спочатку виміряти bottleneck-и й цільові межі; parser досі працює в main thread |
+| V4–V5 | Додаткова аналітика та узгоджена анімація | Вибрати конкретний сценарій з DESIGN_REVIEW; без вигаданих чисел, зі збереженням reduced motion |
+
+Залишаються питання даних: явно визначити місце `УВ "Курськ"` у конфігурації лише за підтвердженим складом; уточнити одиницю територій. Поточний UI чесно показує обмеження. Зміна структури книги або математичних правил не входить до цього етапу.
