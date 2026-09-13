@@ -12,7 +12,7 @@ const button=$('#compare-open'),mobileButton=$('#mobile-compare'),dialog=$('#com
 if(!button||!dialog)return;
 
 let model=null,sourceName=C.APP_CONFIG.defaultWorkbook,sourceKind=C.APP_CONFIG.sourceKinds.BUNDLED;
-let catalog=[],selected=new Set(DEFAULT_SELECTION),chart=null,chartType='area',valueMode='normalized';
+let catalog=[],selected=new Set(DEFAULT_SELECTION),chart=null,chartType='area',valueMode='normalized',activeView='chart';
 let range={from:null,to:null},bounds={from:null,to:null};
 const selectedUnits=new Set(),expandedUnits=new Set(),openCategories=new Set();
 
@@ -20,7 +20,40 @@ const dayStamp=day=>Date.parse(day+'T12:00:00Z');
 const clamp=(value,min,max)=>value<min?min:value>max?max:value;
 const daysBetween=(from,to)=>{const rows=[];for(let day=from;day<=to;day=D.shift(day,1))rows.push(day);return rows};
 const mobileComparison=()=>matchMedia('(max-width:650px)').matches;
+const comparisonChartHeight=()=>matchMedia('(max-width:900px)').matches?420:480;
 function syncMobileDialogOffset(){const nav=$('.mobile-nav'),height=nav?.getBoundingClientRect().height||64;dialog.style.setProperty('--compare-mobile-nav-height',height+'px')}
+
+function setCompareView(next,rerender=true){
+ const target=next==='details'?'details':'chart',changed=activeView!==target;activeView=target;
+ const chartPanel=$('#compare-chart-panel'),tablePanel=dialog.querySelector('.compare-table-panel'),chartHeading=chartPanel?.querySelector('.compare-fold-heading'),tableHeading=tablePanel?.querySelector('.panel-heading');
+ chartPanel?.classList.toggle('is-collapsed',activeView!=='chart');
+ tablePanel?.classList.toggle('is-collapsed',activeView!=='details');
+ chartHeading?.setAttribute('aria-expanded',String(activeView==='chart'));
+ tableHeading?.setAttribute('aria-expanded',String(activeView==='details'));
+ if(activeView==='details'&&chart){chart.destroy();chart=null;const host=$('#compare-chart');if(host)host.innerHTML=''}
+ if(rerender&&changed&&activeView==='chart'&&model&&range.from&&range.to)renderAnalysis();
+}
+
+function ensureCompareAccordion(){
+ const workspace=dialog.querySelector('.compare-workspace'),chartNode=$('#compare-chart'),dataNote=$('#compare-data-note'),tablePanel=dialog.querySelector('.compare-table-panel');
+ if(!workspace||!chartNode||!dataNote||!tablePanel)return;
+ let chartPanel=$('#compare-chart-panel');
+ if(!chartPanel){
+  chartPanel=document.createElement('section');chartPanel.id='compare-chart-panel';chartPanel.className='panel compare-chart-panel';
+  const heading=document.createElement('button');heading.type='button';heading.className='panel-heading compare-fold-heading compare-chart-heading';heading.id='compare-chart-toggle';heading.setAttribute('aria-controls','compare-chart-body');heading.innerHTML='<div><h3>Графік</h3><p>Візуальне порівняння обраних показників</p></div><span class="compare-fold-chevron" aria-hidden="true">›</span>';
+  const body=document.createElement('div');body.id='compare-chart-body';body.className='compare-chart-body';
+  chartNode.before(chartPanel);chartPanel.append(heading,body);body.append(chartNode,dataNote);
+  heading.addEventListener('click',()=>setCompareView('chart'));
+ }
+ const tableHeading=tablePanel.querySelector('.panel-heading'),tableTitle=tableHeading?.querySelector('h3');
+ if(tableTitle)tableTitle.textContent='Деталі';
+ if(tableHeading&&!tableHeading.dataset.compareAccordionBound){
+  tableHeading.dataset.compareAccordionBound='true';tableHeading.classList.add('compare-fold-heading');tableHeading.setAttribute('role','button');tableHeading.setAttribute('tabindex','0');tableHeading.setAttribute('aria-controls','compare-table-head');
+  const chevron=document.createElement('span');chevron.className='compare-fold-chevron';chevron.setAttribute('aria-hidden','true');chevron.textContent='›';tableHeading.append(chevron);
+  const activate=()=>setCompareView('details');tableHeading.addEventListener('click',activate);tableHeading.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();activate()}});
+ }
+ setCompareView(activeView,false);
+}
 
 const unitMeta=new Map();
 function indexUnits(nodes,parent=null,depth=0){for(const node of nodes||[]){unitMeta.set(node.name,{node,parent,depth});indexUnits(node.children,node.name,depth+1)}}
@@ -86,7 +119,7 @@ function setLoading(text){$('#compare-status').textContent=text;$('#compare-stat
 function setMessage(text=''){const node=$('#compare-selection-note');node.textContent=text;node.hidden=!text}
 
 function renderShell(){
- if(!model)return;
+ if(!model)return;ensureCompareAccordion();
  $('#compare-source-note').textContent=`Джерело: ${sourceName}${sourceKind===C.APP_CONFIG.sourceKinds.BUNDLED?' · тестова книга':' · імпортована книга'}`;
  const from=$('#compare-from'),to=$('#compare-to');from.min=to.min=bounds.from;from.max=to.max=bounds.to;from.value=range.from;to.value=range.to;
  renderCatalog();renderUnitTree();syncButtons();renderAnalysis();
@@ -165,7 +198,7 @@ function analysisRows(){
 function chartOptions(rows){
  const base=H.baseOptions(matchMedia('(prefers-reduced-motion: reduce)').matches),all=rows.series.flatMap(series=>series.values.filter(value=>value!==null));
  const limits=valueMode==='normalized'?D.axisRange(all):D.integerAxis(all,false);
- return {...base,chart:{...base.chart,type:chartType,height:420,zoom:{enabled:false}},series:rows.series.map(series=>({name:series.item.categoryName===series.item.name?series.item.name:`${series.item.categoryName} · ${series.item.name}`,data:rows.days.map((day,index)=>({x:dayStamp(day),y:series.values[index]}))})),colors:rows.series.map(series=>series.color),stroke:{...base.stroke,width:chartType==='area'?2.2:0},fill:chartType==='area'?{type:'gradient',gradient:{opacityFrom:.24,opacityTo:.02}}:{type:'solid',opacity:.9},plotOptions:{bar:{columnWidth:'62%',borderRadius:2}},xaxis:{type:'datetime',labels:{datetimeUTC:true,formatter:(value,stamp)=>shortDate(new Date(stamp).toISOString().slice(0,10))},axisBorder:{show:false},axisTicks:{show:false},tooltip:{enabled:false}},yaxis:{...limits,forceNiceScale:false,labels:{formatter:value=>valueMode==='normalized'?`${Math.round(value)}`:fmt(Math.round(value))},title:{text:valueMode==='normalized'?'Індекс, база = 100':'Абсолютне значення'}},tooltip:{theme:'dark',shared:true,intersect:false,x:{formatter:stamp=>fullDate(new Date(stamp).toISOString().slice(0,10))},y:{formatter:value=>value===null||value===undefined?'—':valueMode==='normalized'?`${fmt(Math.round(value*10)/10)} інд.`:fmt(value)}},legend:{...base.legend,onItemClick:{toggleDataSeries:true}}};
+ return {...base,chart:{...base.chart,type:chartType,height:comparisonChartHeight(),zoom:{enabled:false}},series:rows.series.map(series=>({name:series.item.categoryName===series.item.name?series.item.name:`${series.item.categoryName} · ${series.item.name}`,data:rows.days.map((day,index)=>({x:dayStamp(day),y:series.values[index]}))})),colors:rows.series.map(series=>series.color),stroke:{...base.stroke,width:chartType==='area'?2.2:0},fill:chartType==='area'?{type:'gradient',gradient:{opacityFrom:.24,opacityTo:.02}}:{type:'solid',opacity:.9},plotOptions:{bar:{columnWidth:'62%',borderRadius:2}},xaxis:{type:'datetime',labels:{datetimeUTC:true,formatter:(value,stamp)=>shortDate(new Date(stamp).toISOString().slice(0,10))},axisBorder:{show:false},axisTicks:{show:false},tooltip:{enabled:false}},yaxis:{...limits,forceNiceScale:false,labels:{formatter:value=>valueMode==='normalized'?`${Math.round(value)}`:fmt(Math.round(value))},title:{text:valueMode==='normalized'?'Індекс, база = 100':'Абсолютне значення'}},tooltip:{theme:'dark',shared:true,intersect:false,x:{formatter:stamp=>fullDate(new Date(stamp).toISOString().slice(0,10))},y:{formatter:value=>value===null||value===undefined?'—':valueMode==='normalized'?`${fmt(Math.round(value*10)/10)} інд.`:fmt(value)}},legend:{...base.legend,onItemClick:{toggleDataSeries:true}}};
 }
 
 function tableData(days,items){
@@ -211,13 +244,15 @@ function renderTable(rows){
 }
 
 function renderAnalysis(){
- if(!model||!range.from||!range.to)return;syncButtons();
+ if(!model||!range.from||!range.to)return;ensureCompareAccordion();syncButtons();
  const items=selectedItems(),status=$('#compare-status');
  if(!items.length){chart?.destroy();chart=null;$('#compare-chart').innerHTML='';$('#compare-table-head').innerHTML='';$('#compare-table-body').innerHTML='';if($('#compare-table-foot'))$('#compare-table-foot').textContent='';if($('#compare-unit-breakdown-note'))$('#compare-unit-breakdown-note').hidden=true;status.hidden=false;status.textContent='Оберіть показники у блоці «Показники».';return}
  const validation=D.validateDateRange(range.from,range.to);if(!validation.valid){status.hidden=false;status.textContent=validation.reason;return}
  status.hidden=true;const rows=analysisRows();
  chart?.destroy();chart=null;$('#compare-chart').innerHTML='';
- try{chart=new ApexCharts($('#compare-chart'),chartOptions(rows));chart.render().catch(error=>{console.error(error);status.hidden=false;status.textContent='Не вдалося побудувати графік порівняння.'})}catch(error){console.error(error);status.hidden=false;status.textContent='Не вдалося побудувати графік порівняння.'}
+ if(activeView==='chart'){
+  try{chart=new ApexCharts($('#compare-chart'),chartOptions(rows));chart.render().catch(error=>{console.error(error);status.hidden=false;status.textContent='Не вдалося побудувати графік порівняння.'})}catch(error){console.error(error);status.hidden=false;status.textContent='Не вдалося побудувати графік порівняння.'}
+ }
  renderTable(rows);
  const notes=[];
  if(valueMode==='normalized')notes.push('Нормалізація: перше доступне ненульове значення кожної серії = 100.');else notes.push('Абсолютний режим використовує спільну шкалу; для показників різного порядку величини зручніше нормалізоване порівняння.');
@@ -236,7 +271,7 @@ function applyRange(nextFrom,nextTo){
 }
 
 async function openComparison(){
- if(dialog.open)return;
+ if(dialog.open)return;activeView='chart';ensureCompareAccordion();setCompareView('chart',false);
  if(mobileComparison()){
   syncMobileDialogOffset();dialog.classList.add('compare-mobile-nav');dialog.show();
  }else{
