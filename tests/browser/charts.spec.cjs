@@ -75,7 +75,7 @@ test('cross-category comparison builds a shared analytical view with hierarchica
  await children.nth(1).check();await expect(page.locator('#compare-unit-count')).toContainText('2');await expect(page.locator('#compare-data-note')).toContainText('Серії сумуються');
  await expect(page.locator('#compare-data-note')).toContainText('Нормалізація');
  await expect(page.locator('#compare-table-head')).toContainText('Підрозділ');await expect(page.locator('#compare-table-body')).toContainText(childNames[0]);await expect(page.locator('#compare-table-body')).toContainText(childNames[1]);
- await expect(page.locator('#compare-table-foot')).toContainText('Абсолютні значення джерела');
+ await expect(page.locator('#compare-table-foot')).toBeHidden();
  const tableBeforeMode=await page.locator('#compare-table-body').textContent();
  await page.locator('[data-compare-mode="absolute"]').click();await expect(page.locator('[data-compare-mode="absolute"]')).toHaveAttribute('aria-pressed','true');
  expect(await page.locator('#compare-table-body').textContent()).toEqual(tableBeforeMode);
@@ -87,7 +87,7 @@ test('cross-category comparison builds a shared analytical view with hierarchica
  await page.locator('[data-compare-chart="bar"]').click();await expect(page.locator('[data-compare-chart="bar"]')).toHaveAttribute('aria-pressed','true');
  await expect(page.locator('#compare-table-body tr').first()).toBeVisible();
  await expect(page.locator('.compare-table-panel')).toHaveClass(/panel/);await expect(page.locator('.compare-table-panel')).toHaveClass(/details-panel/);await expect(page.locator('.compare-table-wrap')).toHaveClass(/table-wrap/);
- const detailWrapStyle=await page.locator('#analysis-grid .details-panel .table-wrap').evaluate(el=>{const s=getComputedStyle(el);return {maxHeight:s.maxHeight,overflowX:s.overflowX,overflowY:s.overflowY}}),compareWrapStyle=await page.locator('.compare-table-wrap').evaluate(el=>{const s=getComputedStyle(el);return {maxHeight:s.maxHeight,overflowX:s.overflowX,overflowY:s.overflowY}});expect(compareWrapStyle).toEqual(detailWrapStyle);
+ const compareWrapMetrics=await page.locator('.compare-table-wrap').evaluate(el=>{const s=getComputedStyle(el),table=el.querySelector('table'),wrapRect=el.getBoundingClientRect(),tableRect=table.getBoundingClientRect();return {maxHeight:s.maxHeight,wrapHeight:wrapRect.height,tableHeight:tableRect.height}});expect(compareWrapMetrics.maxHeight).toBe('none');expect(compareWrapMetrics.wrapHeight).toBeGreaterThanOrEqual(compareWrapMetrics.tableHeight-1);
  const dashboardFrom=await page.locator('#from').inputValue(),dashboardTo=await page.locator('#to').inputValue();await page.locator('#compare-dashboard-period').click();await expect(page.locator('#compare-from')).toHaveValue(dashboardFrom);await expect(page.locator('#compare-to')).toHaveValue(dashboardTo);
  await chartToggle.click();await expect(chartPanel).not.toHaveClass(/is-collapsed/);await expect(detailsPanel).toHaveClass(/is-collapsed/);await expect(page.locator('.compare-table-wrap')).toBeHidden();await expect(page.locator('#compare-chart .apexcharts-canvas')).toBeVisible({timeout:15000});await expect(page.locator('[data-compare-chart="bar"]')).toHaveAttribute('aria-pressed','true');
 });
