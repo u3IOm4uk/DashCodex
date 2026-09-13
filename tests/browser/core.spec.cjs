@@ -19,7 +19,7 @@ test('core dashboard flow',async({page})=>{
  await expect(page.locator('#table-body')).toBeVisible();
 });
 
-test('mobile category stepper stays above navigation and previews target categories',async({page})=>{
+test('mobile category stepper stays compact above navigation and previews target categories',async({page})=>{
  await page.setViewportSize({width:390,height:844});
  await openDashboard(page);
  const cards=page.locator('#metrics .metric-card');
@@ -37,8 +37,14 @@ test('mobile category stepper stays above navigation and previews target categor
  await expect(previous).toHaveAttribute('aria-label',`Попередня категорія: ${previousTarget.name}`);
  await expect(next).toHaveAttribute('aria-label',`Наступна категорія: ${nextTarget.name}`);
  const [previousBox,nextBox,navBox]=await Promise.all([previous.boundingBox(),next.boundingBox(),nav.boundingBox()]);
- expect(Math.abs(previousBox.y+previousBox.height-navBox.y)).toBeLessThanOrEqual(1);
- expect(Math.abs(nextBox.y+nextBox.height-navBox.y)).toBeLessThanOrEqual(1);
+ const previousGap=navBox.y-(previousBox.y+previousBox.height),nextGap=navBox.y-(nextBox.y+nextBox.height);
+ expect(previousGap).toBeGreaterThanOrEqual(7);
+ expect(previousGap).toBeLessThanOrEqual(9);
+ expect(nextGap).toBeGreaterThanOrEqual(7);
+ expect(nextGap).toBeLessThanOrEqual(9);
+ expect(previousBox.width).toBeLessThan(390/2);
+ expect(nextBox.width).toBeLessThan(390/2);
+ expect(nextBox.x-(previousBox.x+previousBox.width)).toBeGreaterThan(0);
  expect(await previous.evaluate(el=>getComputedStyle(el).position)).toBe('fixed');
  await next.click();
  await expect(page.locator(`#metrics [data-metric="${nextTarget.id}"]`)).toHaveAttribute('aria-pressed','true');
