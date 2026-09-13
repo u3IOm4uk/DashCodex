@@ -61,4 +61,4 @@
 
 Стабільний `main` містить інтегрований конструктор міжкатегорійного порівняння. Подальші зміни конструктора мають зберігати `UNIT_HIERARCHY`, Excel schema, normalized records і базову aggregate math без прямої потреби їх змінювати; для responsive/layout змін застосовувати відповідний change-scoped browser coverage.
 
-Інтеграція конструктора виконана через PR #11. Повторний pre-merge `Change-scoped quality` пройшов успішно, а post-merge run #79 для `main` також завершився успішно.
+Базова інтеграція конструктора виконана через PR #11. Останній пакет UI-уточнень конструктора інтегровано через PR #12 (`fix: refine mobile comparison controls and folding`). Pre-merge `Change-scoped quality` run #84 пройшов успішно; post-merge run #85 для `main` також завершився успішно. Поточний verified baseline `main`: `0f1cefc7710edbcecc6724d0980f6ed759d92853`.
