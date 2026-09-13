@@ -57,12 +57,15 @@ test('cross-category comparison builds a shared analytical view with hierarchica
  await page.locator('#compare-open').click();await expect(page.locator('#compare-dialog')).toBeVisible();
  const categories=page.locator('#compare-catalog .compare-category');expect(await categories.count()).toBeGreaterThan(0);expect(await categories.evaluateAll(nodes=>nodes.every(node=>!node.open))).toBe(true);
  await categories.first().locator('summary').click();await expect(categories.first().locator('[data-compare-metric]').first()).toBeVisible({timeout:15000});
- await expect(page.locator('#compare-chart .apexcharts-canvas')).toBeVisible({timeout:15000});
+ const chartPanel=page.locator('#compare-chart-panel'),detailsPanel=page.locator('.compare-table-panel'),detailsHeading=detailsPanel.locator('.panel-heading'),chartToggle=page.locator('#compare-chart-toggle');
+ await expect(chartPanel).not.toHaveClass(/is-collapsed/);await expect(detailsPanel).toHaveClass(/is-collapsed/);await expect(detailsHeading.locator('h3')).toHaveText('Деталі');await expect(chartToggle).toHaveAttribute('aria-expanded','true');await expect(detailsHeading).toHaveAttribute('aria-expanded','false');
+ await expect(page.locator('#compare-chart .apexcharts-canvas')).toBeVisible({timeout:15000});const expandedChartBox=await page.locator('#compare-chart').boundingBox();expect(expandedChartBox.height).toBeGreaterThanOrEqual(420);
  const checked=page.locator('#compare-catalog [data-compare-metric]:checked');expect(await checked.count()).toBeGreaterThanOrEqual(2);
  const [metricsBox,workspaceBox,unitsBox]=await Promise.all([page.locator('.compare-metrics-panel').boundingBox(),page.locator('.compare-workspace').boundingBox(),page.locator('.compare-units-panel').boundingBox()]);
  expect(metricsBox.x+metricsBox.width).toBeLessThanOrEqual(workspaceBox.x+1);expect(unitsBox.x).toBeGreaterThanOrEqual(workspaceBox.x+workspaceBox.width-1);
  const graphControls=page.locator('.compare-chart-controls');await expect(graphControls).toHaveClass(/segmented/);expect(await graphControls.locator('button').allTextContents()).toEqual(['','']);
  const valueControls=page.locator('.compare-value-controls');await expect(valueControls).toHaveClass(/segmented/);
+ await detailsHeading.click();await expect(detailsPanel).not.toHaveClass(/is-collapsed/);await expect(chartPanel).toHaveClass(/is-collapsed/);await expect(detailsHeading).toHaveAttribute('aria-expanded','true');await expect(chartToggle).toHaveAttribute('aria-expanded','false');await expect(page.locator('.compare-table-wrap')).toBeVisible();await expect(page.locator('#compare-chart .apexcharts-canvas')).toHaveCount(0);
  await expect(page.locator('#compare-units-all')).toHaveAttribute('aria-pressed','true');
  const parentToggle=page.locator('#compare-unit-tree [data-unit-toggle]').first(),parentRow=parentToggle.locator('xpath=..'),parentNode=parentRow.locator('xpath=..'),parentInput=parentRow.locator('[data-compare-unit]');
  await parentInput.check();await expect(parentInput).toBeChecked();await expect(parentToggle).toHaveAttribute('aria-expanded','true');
@@ -86,6 +89,7 @@ test('cross-category comparison builds a shared analytical view with hierarchica
  await expect(page.locator('.compare-table-panel')).toHaveClass(/panel/);await expect(page.locator('.compare-table-panel')).toHaveClass(/details-panel/);await expect(page.locator('.compare-table-wrap')).toHaveClass(/table-wrap/);
  const detailWrapStyle=await page.locator('#analysis-grid .details-panel .table-wrap').evaluate(el=>{const s=getComputedStyle(el);return {maxHeight:s.maxHeight,overflowX:s.overflowX,overflowY:s.overflowY}}),compareWrapStyle=await page.locator('.compare-table-wrap').evaluate(el=>{const s=getComputedStyle(el);return {maxHeight:s.maxHeight,overflowX:s.overflowX,overflowY:s.overflowY}});expect(compareWrapStyle).toEqual(detailWrapStyle);
  const dashboardFrom=await page.locator('#from').inputValue(),dashboardTo=await page.locator('#to').inputValue();await page.locator('#compare-dashboard-period').click();await expect(page.locator('#compare-from')).toHaveValue(dashboardFrom);await expect(page.locator('#compare-to')).toHaveValue(dashboardTo);
+ await chartToggle.click();await expect(chartPanel).not.toHaveClass(/is-collapsed/);await expect(detailsPanel).toHaveClass(/is-collapsed/);await expect(page.locator('.compare-table-wrap')).toBeHidden();await expect(page.locator('#compare-chart .apexcharts-canvas')).toBeVisible({timeout:15000});await expect(page.locator('[data-compare-chart="bar"]')).toHaveAttribute('aria-pressed','true');
 });
 
 test('comparison action keeps mobile navigation and opens filters as dropdown overlays',async({page})=>{
