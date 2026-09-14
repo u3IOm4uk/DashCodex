@@ -205,12 +205,13 @@ main{padding-top:98px}
 #distribution-donut{padding:12px 8px;overflow:auto;min-height:0;flex:1}#distribution-donut svg{display:block;width:100%;min-height:250px}
 #distribution-donut[hidden],#distribution-legend[hidden]{display:none}
 /* Each source value owns the change beneath it and the trend beside it. */
-#metrics .metric-card{height:156px;flex-basis:240px;max-width:none;padding:10px 14px;display:flex;gap:6px}
-#metrics .metric-card-paired{flex-basis:320px;max-width:none}
+#metrics .metric-card{height:156px;flex:0 0 auto;width:max-content;max-width:none;padding:10px 14px;display:flex;gap:6px}
+#metrics .metric-card-paired{flex-basis:auto;max-width:none}
 #metrics .metric-top{height:auto;min-height:17px;line-height:15px;font-size:12px}
-#metrics .card-stats,#metrics .card-stats.paired{display:grid;grid-template-columns:1fr;gap:4px;height:auto;flex:1;min-height:0;margin:0}
+#metrics .card-stats,#metrics .card-stats.paired{display:grid;grid-template-columns:max-content;gap:12px;height:auto;flex:1;min-height:0;margin:0}
+#metrics .card-stats.paired{grid-template-columns:repeat(2,max-content)}
 #metrics .card-stats>div+div{padding:0;border:0}
-#metrics .metric-series{display:grid;grid-template-columns:minmax(70px,1fr) minmax(40px,1fr);gap:12px;align-items:center;min-height:0}
+#metrics .metric-series{display:grid;grid-template-columns:minmax(70px,max-content) 100px;gap:6px;align-items:center;min-height:0}
 #metrics .stat-value{display:flex;flex-direction:column;align-items:flex-start;gap:0;flex-wrap:nowrap}
 #metrics .stat-value strong{font-size:25px;line-height:27px;color:var(--series-color)}
 #metrics .stat-value .change-badge{font-size:10px;line-height:13px;white-space:nowrap}
@@ -219,11 +220,11 @@ main{padding-top:98px}
 #metrics .metric-balance{font-size:10px;color:var(--gold);position:absolute;right:14px;top:10px}
 #metrics .card-missing{font-size:10px;line-height:12px;margin:0}
 .cards-away #workspace-dock #metrics,.cards-away #workspace-dock #metrics:has(.card-missing){height:144px;gap:9px}
-.cards-away #metrics .metric-card,.cards-away #metrics:has(.card-missing) .metric-card{height:130px;flex-basis:150px;padding:8px 10px;max-width:none}
-.cards-away #metrics .metric-card-paired{flex-basis:208px;max-width:none}
+.cards-away #metrics .metric-card,.cards-away #metrics:has(.card-missing) .metric-card{height:130px;flex-basis:auto;padding:8px 10px;max-width:none}
+.cards-away #metrics .metric-card-paired{flex-basis:auto;max-width:none}
 .cards-away #metrics .metric-top{height:auto;min-height:14px;font-size:10px;line-height:13px}
-.cards-away #metrics .metric-series{grid-template-columns:minmax(65px,1fr) minmax(24px,.7fr);gap:6px}
+.cards-away #metrics .metric-series{grid-template-columns:minmax(65px,max-content) 40px;gap:6px}
 .cards-away #metrics .stat-value strong{font-size:20px;line-height:22px}.cards-away #metrics .stat-value .change-badge{font-size:9px;line-height:12px}
 .cards-away #metrics .metric-trend{height:25px}.cards-away #metrics .card-stats.paired>div+div{padding:0}
 .cards-away #metrics .metric-balance{position:static;font-size:9px;line-height:10px}
-@media(max-width:650px){.period-selection{width:100%;min-height:40px;font-size:12px}.filterbar .presets{margin:0}.rail-heading #inline-sections{gap:2px}.rail-heading #inline-sections button{padding:6px 7px;font-size:10px;gap:4px}.rail-heading #inline-sections .icon{width:12px}.rail-heading .compare-open{display:none}#metrics .metric-card-paired{flex-basis:290px}#distribution-donut{padding:10px 4px}.unit-controls{flex-wrap:wrap}}
+@media(max-width:650px){.period-selection{width:100%;min-height:40px;font-size:12px}.filterbar .presets{margin:0}.rail-heading #inline-sections{gap:2px}.rail-heading #inline-sections button{padding:6px 7px;font-size:10px;gap:4px}.rail-heading #inline-sections .icon{width:12px}.rail-heading .compare-open{display:none}#metrics .metric-card-paired{flex-basis:auto}#distribution-donut{padding:10px 4px}.unit-controls{flex-wrap:wrap}}
