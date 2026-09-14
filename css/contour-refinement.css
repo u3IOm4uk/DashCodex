@@ -247,3 +247,6 @@ main{padding-top:98px}
 #workspace-dock .workspace-toolbar .section-nav-row{grid-template-columns:minmax(0,1fr) max-content minmax(max-content,1fr)}
 #workspace-dock .workspace-toolbar #inline-sections{overflow:visible}
 @media(max-width:650px){#workspace-dock .workspace-toolbar{gap:10px}#workspace-dock .workspace-toolbar .section-nav-row{grid-template-columns:0 max-content 0;gap:0}}
+
+/* Keep detail totals compact and give the chart the remaining width. */
+@media(min-width:651px){#detail-dialog .detail-summary{grid-template-columns:minmax(0,160px) minmax(0,1fr);column-gap:16px}#detail-dialog .detail-values{min-width:0;overflow-wrap:anywhere}}
