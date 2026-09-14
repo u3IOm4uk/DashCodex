@@ -1,48 +1,15 @@
 @echo off
-setlocal
 cd /d "%~dp0"
 
-set "PORT=8080"
-set "HOST=127.0.0.1"
-set "URL=http://%HOST%:%PORT%/"
-
-where py >nul 2>nul
-if %errorlevel%==0 (
-    set "PY_CMD=py -3"
-    goto :run
-)
-
-where python >nul 2>nul
-if %errorlevel%==0 (
-    set "PY_CMD=python"
-    goto :run
-)
-
-where python3 >nul 2>nul
-if %errorlevel%==0 (
-    set "PY_CMD=python3"
-    goto :run
-)
-
-echo [ПОМИЛКА] Python 3 не знайдено у PATH.
-echo Встановіть Python 3 або запустіть у корені проєкту:
-echo   python -m http.server %PORT% --bind %HOST%
 echo.
+echo ==========================================
+echo Dashboard:
+echo http://192.168.0.3:8080/
+echo ==========================================
+echo.
+echo Keep this window open while using dashboard.
+echo.
+
+"C:\Users\Osiris\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe" -m http.server 8080 --bind 0.0.0.0
+
 pause
-exit /b 1
-
-:run
-echo КОНТУР: %URL%
-echo Сервер доступний лише локально на цьому ПК.
-echo Закрийте це вікно, щоб зупинити сервер.
-echo.
-start "" "%URL%"
-%PY_CMD% -m http.server %PORT% --bind %HOST%
-
-if errorlevel 1 (
-    echo.
-    echo [ПОМИЛКА] Не вдалося запустити локальний HTTP-сервер.
-    pause
-)
-
-endlocal
