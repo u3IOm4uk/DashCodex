@@ -56,7 +56,7 @@ function loadStatuses(storage){
   try{
     const raw=storage?.getItem(STORAGE_KEY);if(!raw)return {};
     const parsed=JSON.parse(raw),result={};
-    for(const [name,status] of Object.entries(parsed||{}))if(validStatus(status)&&status!==STATUS.ACTIVE)result[name]=status;
+    for(const [name,status] of Object.entries(parsed||{}))if(validStatus(status))result[name]=status;
     return result;
   }catch{return {}}
 }
@@ -70,17 +70,17 @@ let refreshQueued=false,observer=null,detailObserver=null;
 const storage=typeof localStorage!=='undefined'?localStorage:null;
 statuses=loadStatuses(storage);
 
-function statusOf(name){return statuses[name]||STATUS.ACTIVE}
+function statusOf(name){return statuses[name]||(nodeOf(name)?.unconfigured?STATUS.HIDDEN:STATUS.ACTIVE)}
 function setStatus(name,status){
   if(!validStatus(status))return;
-  if(status===STATUS.ACTIVE)delete statuses[name];else statuses[name]=status;
+  if(status===STATUS.ACTIVE&&!nodeOf(name)?.unconfigured)delete statuses[name];else statuses[name]=status;
   saveStatuses(storage,statuses);requestRefresh();renderManager();
 }
 function setData(next){data=next;catalog=buildCatalog(next);expanded.clear();requestRefresh();}
 function nodeOf(name){return catalog.index[clean(name)]||null}
 function parentChain(node){const chain=[];let current=node;const guard=new Set();while(current?.parent&&catalog.index[current.parent]&&!guard.has(current.parent)){guard.add(current.parent);current=catalog.index[current.parent];chain.unshift(current)}return chain}
 function visibleByStatus(node){const status=statusOf(node.name);return status!==STATUS.HIDDEN&&(status!==STATUS.ARCHIVED||showArchived)}
-function visibleNode(node){if(showHidden)return node.unconfigured||statusOf(node.name)===STATUS.HIDDEN;if(node.unconfigured)return false;if(!visibleByStatus(node))return false;for(const parent of parentChain(node)){if(!visibleByStatus(parent)||!expanded.has(parent.name))return false}return true}
+function visibleNode(node){if(showHidden)return statusOf(node.name)===STATUS.HIDDEN;if(!visibleByStatus(node))return false;for(const parent of parentChain(node)){if(!visibleByStatus(parent)||!expanded.has(parent.name))return false}return true}
 function isLastSibling(node){if(!node?.parent)return true;const siblings=catalog.index[node.parent]?.children||[];return siblings.at(-1)===node.name}
 function descendants(name){const result=[],stack=[...(catalog.index[name]?.children||[])];while(stack.length){const child=stack.shift(),node=catalog.index[child];if(!node)continue;result.push(child);stack.unshift(...node.children)}return result}
 function visibleDescendantRows(name){const names=new Set(descendants(name));return [...document.querySelectorAll('#table-body tr')].filter(row=>names.has(row.dataset.unitName)&&!row.hidden)}
@@ -132,6 +132,8 @@ function decorateRow(row,node){
     button.prepend(branch);
   }
   main.append(button);cell.append(main);
+  const restore=document.createElement('button');restore.type='button';restore.className='unit-restore';restore.textContent='Повернути';restore.setAttribute('aria-label','Повернути до загального списку: '+node.name);restore.hidden=true;
+  restore.onclick=event=>{event.preventDefault();event.stopPropagation();for(const parent of parentChain(node)){setStatus(parent.name,STATUS.ACTIVE);expanded.add(parent.name)}setStatus(node.name,STATUS.ACTIVE);showHidden=false;requestRefresh()};main.append(restore);
   if(node.unconfigured){const badge=document.createElement('span');badge.className='unit-badge';badge.textContent='не в конфіг.';name.after(badge)}
 }
 function reorderRows(rows){
@@ -167,11 +169,11 @@ async function toggle(name){
 }
 function applyTableState(){
   if(typeof document==='undefined')return[];ensureControls();ensureDialog();const controls=document.querySelector('#unit-controls');if(controls)controls.hidden=!isOpsTable();if(!isOpsTable())return[];
-  const hiddenToggle=document.querySelector('#unit-hidden-toggle');if(hiddenToggle){hiddenToggle.setAttribute('aria-pressed',String(showHidden));const count=catalog.nodes.filter(n=>n.unconfigured||statusOf(n.name)===STATUS.HIDDEN).length;hiddenToggle.textContent='Приховані'+(count?' · '+count:'')}
+  const hiddenToggle=document.querySelector('#unit-hidden-toggle');if(hiddenToggle){hiddenToggle.setAttribute('aria-pressed',String(showHidden));const count=catalog.nodes.filter(n=>statusOf(n.name)===STATUS.HIDDEN).length;hiddenToggle.textContent='Приховані'+(count?' · '+count:'')}
   const archiveToggle=document.querySelector('#unit-archive-toggle');if(archiveToggle){archiveToggle.setAttribute('aria-pressed',String(showArchived));const count=catalog.nodes.filter(n=>statusOf(n.name)===STATUS.ARCHIVED).length;archiveToggle.textContent=`Архів${count?' · '+count:''}`}
   const sourceRows=[...document.querySelectorAll('#table-body tr')];for(const row of sourceRows){const name=clean(row.querySelector('.row-name')?.textContent),node=nodeOf(name);if(node)decorateRow(row,node)}
   const rows=reorderRows(sourceRows);
-  for(const row of rows){const name=clean(row.querySelector('.row-name')?.textContent),node=nodeOf(name);if(!node)continue;const status=statusOf(node.name);row.classList.toggle('unit-status-archived',status===STATUS.ARCHIVED);row.classList.toggle('unit-status-hidden',status===STATUS.HIDDEN);row.hidden=!visibleNode(node);const expand=row.querySelector('.unit-expand');if(expand){const open=expanded.has(node.name);expand.setAttribute('aria-expanded',String(open));expand.textContent=open?'−':'+';expand.setAttribute('aria-label',`${open?'Згорнути':'Розгорнути'}: ${node.name}`)}}
+  for(const row of rows){const name=clean(row.querySelector('.row-name')?.textContent),node=nodeOf(name);if(!node)continue;const status=statusOf(node.name);row.classList.toggle('unit-status-archived',status===STATUS.ARCHIVED);row.classList.toggle('unit-status-hidden',status===STATUS.HIDDEN);row.hidden=!visibleNode(node);const restore=row.querySelector('.unit-restore');if(restore)restore.hidden=!showHidden||status!==STATUS.HIDDEN;const expand=row.querySelector('.unit-expand');if(expand){const open=expanded.has(node.name);expand.setAttribute('aria-expanded',String(open));expand.textContent=open?'−':'+';expand.setAttribute('aria-label',`${open?'Згорнути':'Розгорнути'}: ${node.name}`)}}
   reindexVisibleRows(rows);return rows;
 }
 
