@@ -233,3 +233,9 @@ main{padding-top:98px}
 .cards-away #metrics .metric-trend{height:25px}.cards-away #metrics .card-stats.paired>div+div{padding:0}
 .cards-away #metrics .metric-balance{position:static;font-size:9px;line-height:10px}
 @media(max-width:650px){.period-selection{width:100%;min-height:40px;font-size:12px}.filterbar .presets{margin:0}.rail-heading #inline-sections{gap:2px}.rail-heading #inline-sections button{padding:6px 7px;font-size:10px;gap:4px}.rail-heading #inline-sections .icon{width:12px}.rail-heading .compare-open{display:none}#metrics .metric-card-paired{flex-basis:auto}#distribution-donut{padding:10px 4px}.unit-controls{flex-wrap:wrap}}
+
+/* Date selection and quick periods share one row at every viewport. */
+#workspace-dock .filterbar{flex-wrap:nowrap;overflow-x:auto;gap:8px}
+#workspace-dock .period-selection{flex:0 0 auto;width:auto;white-space:nowrap}
+#workspace-dock .presets{display:flex;order:0;width:auto;flex:0 0 auto;margin:0;white-space:nowrap}
+@media(max-width:650px){#workspace-dock .filterbar{gap:4px}#workspace-dock .period-selection{padding:7px 6px;gap:4px;font-size:10px;min-height:36px}#workspace-dock .period-selection .icon{width:13px}#workspace-dock .presets{gap:0}#workspace-dock .presets button{padding:8px 5px;font-size:10px}#metrics .metric-series{column-gap:2px}#metrics .metric-numbers{text-align:right}#metrics .stat-value{align-items:flex-end}}

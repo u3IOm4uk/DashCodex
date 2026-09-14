@@ -16,7 +16,7 @@ const palette=[D.colors.gold,D.colors.blue,D.colors.red,D.colors.green,D.colors.
 function notify(message){$('#toast').textContent=message;$('#toast').classList.add('show');clearTimeout(notify.timer);notify.timer=setTimeout(()=>$('#toast').classList.remove('show'),3200)}
 function empty(el,text='Немає даних за цей період',note='Змініть період або завантажте іншу книгу.'){el.innerHTML=`<div class="empty">${esc(text)}<small>${esc(note)}</small></div>`}
 function chartError(el,error){console.error(error);empty(el,'Не вдалося побудувати графік','Табличні дані залишаються доступними. Спробуйте змінити період або категорію.')}
-function setRange(days=7){mainPlotWindow=null;const dates=data.sheets[section.sheet].dates;to=dates.at(-1);from=days==='all'?dates[0]:D.shift(to,-Number(days)+1);$('#from').value=from;$('#to').value=to;syncPeriodLabel();$$('[data-days]').forEach(b=>b.classList.toggle('active',b.dataset.days===String(days)))}
+function setRange(days=7){mainPlotWindow=null;const dates=data.sheets[section.sheet].dates;const now=new Date();to=Number(days)===1?[now.getFullYear(),String(now.getMonth()+1).padStart(2,'0'),String(now.getDate()).padStart(2,'0')].join('-'):dates.at(-1);from=D.shift(to,-Number(days)+1);$('#from').value=from;$('#to').value=to;syncPeriodLabel();$$('[data-days]').forEach(b=>b.classList.toggle('active',b.dataset.days===String(days)))}
 function selectSection(id){distributionIndex=0;section=sections.find(s=>s.id===id)||sections[0];category=section.categories[0];setRange(7);render()}
 function selectCategory(id){
  categorySizeLock=document.body.classList.contains('cards-away');returningToTop=scrollY>0;
