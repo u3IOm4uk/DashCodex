@@ -239,3 +239,11 @@ main{padding-top:98px}
 #workspace-dock .period-selection{flex:0 0 auto;width:auto;white-space:nowrap}
 #workspace-dock .presets{display:flex;order:0;width:auto;flex:0 0 auto;margin:0;white-space:nowrap}
 @media(max-width:650px){#workspace-dock .filterbar{gap:4px}#workspace-dock .period-selection{padding:7px 6px;gap:4px;font-size:10px;min-height:36px}#workspace-dock .period-selection .icon{width:13px}#workspace-dock .presets{gap:0}#workspace-dock .presets button{padding:8px 5px;font-size:10px}#metrics .metric-series{column-gap:2px}#metrics .metric-numbers{text-align:right}#metrics .stat-value{align-items:flex-end}}
+
+/* Shared horizontal toolbar for period selection and section navigation. */
+#workspace-dock .workspace-toolbar{display:flex;align-items:center;gap:16px;overflow-x:auto;scrollbar-width:thin}
+#workspace-dock .workspace-toolbar .filterbar{flex:0 0 auto;overflow:visible;border:0}
+#workspace-dock .workspace-toolbar .rail-heading{flex:1 0 auto;width:auto;min-width:0}
+#workspace-dock .workspace-toolbar .section-nav-row{grid-template-columns:minmax(0,1fr) max-content minmax(max-content,1fr)}
+#workspace-dock .workspace-toolbar #inline-sections{overflow:visible}
+@media(max-width:650px){#workspace-dock .workspace-toolbar{gap:10px}#workspace-dock .workspace-toolbar .section-nav-row{grid-template-columns:0 max-content 0;gap:0}}

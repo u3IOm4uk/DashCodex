@@ -1,7 +1,7 @@
 /* Comparison owns its layout, controls and semantic text surfaces. */
-.section-nav-row { display:flex; align-items:center; gap:10px; min-width:0; }
-.section-nav-row #inline-sections { flex:1; min-width:0; }
-.section-nav-row > .compare-open { flex:0 0 auto; margin-left:auto; }
+.section-nav-row { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,max-content) minmax(0,1fr); align-items:center; gap:10px; min-width:0; }
+.section-nav-row #inline-sections { grid-column:2; min-width:0; justify-content:safe center; }
+.section-nav-row > .compare-open { grid-column:3; justify-self:end; }
 .compare-open { min-height:34px; padding:6px 12px; gap:6px; white-space:nowrap; }
 .compare-dialog {
   --compare-canvas:#0e1214; --compare-panel:#151b1e; --compare-raised:#1d272b;
