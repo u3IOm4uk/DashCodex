@@ -45,7 +45,7 @@ test('crossed dates align to edited boundary and table remains absolute',async({
  await expect(page.locator('#compare-from')).toHaveValue('2026-09-07');
  const original=await page.locator('#compare-table-body').textContent();await page.locator('[data-compare-mode="absolute"]').click();
  expect(await page.locator('#compare-table-body').textContent()).toBe(original);
- await page.locator('[data-compare-close]').click();await page.locator('#from').fill('2026-09-10');await page.locator('#from').press('Tab');
+ await page.locator('[data-compare-close]').click();await page.locator('#period-open').click();await page.locator('[data-period-mode="range"]').click();await page.locator('#period-start').fill('2026-09-10');await page.locator('#period-start').press('Tab');await page.locator('#period-apply').click();
  await expect(page.locator('#to')).toHaveValue('2026-09-10');
 });
 
@@ -73,11 +73,10 @@ test('series retain colors after removal and show their own normalization base',
  expect(await chips.evaluateAll(nodes=>nodes.map(node=>({id:node.querySelector('button').dataset.removeSeries,color:node.style.getPropertyValue('--series-color')})))).toEqual(colors.slice(1));
 });
 
-test('structure identifies its denominator and an invalid import keeps the accepted source',async({page})=>{
- await page.goto('/');await expect(page.locator('#distribution-coverage')).toContainText('2 777',{timeout:15000});
- await expect(page.locator('#distribution-coverage')).toContainText('2 826');await expect(page.locator('#distribution-coverage')).toContainText('49');
+test('an invalid import keeps the accepted source and its totals',async({page})=>{
+ await page.goto('/');await expect(page.locator('[data-metric="shells"] strong')).toContainText('2 826',{timeout:15000});
  const book=XLSX.utils.book_new();XLSX.utils.book_append_sheet(book,XLSX.utils.aoa_to_sheet([['Дата','Угруповання','Обстріли'],['2026-02-31','ВСЬОГО за СО:',1]]),'ГОЧ');
  await page.locator('#file-input').setInputFiles({name:'invalid.xlsx',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',buffer:Buffer.from(XLSX.write(book,{type:'buffer',bookType:'xlsx'}))});
  await expect(page.locator('#toast')).toContainText('рядок 2');await expect(page.locator('#source-label')).toContainText('Тестова книга');
- await expect(page.locator('#distribution-coverage')).toContainText('2 826');
+ await expect(page.locator('[data-metric="shells"] strong')).toContainText('2 826');
 });

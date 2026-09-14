@@ -127,7 +127,7 @@ Area/bar та territory balance; hover мініграфіка з датою/зн
 | Audit dates | Змінена межа має пріоритет в обох UI; таблиця лишається абсолютною |
 | Audit accessibility | Tab/Enter/Space/Escape, повернення фокусу, контраст примітки ≥4,5:1 |
 | Audit bulk/series | Один chart render для All; derived parent не додається до scope; видалення зберігає кольори решти; видима база |
-| Audit import/coverage | Явні denominator/source/difference; invalid-date import зберігає прийняту книгу |
+| Audit import/coverage | Invalid-date import зберігає прийняту книгу та її source totals |
 
 Node unit tests у tests/unit покривають календарну коректність і block policy, пріоритет межі, конкуренцію асинхронних source reads та quality routing. Числові контрольні сценарії залишаються в adapter regression.
 
@@ -144,3 +144,7 @@ Node unit tests у tests/unit покривають календарну коре
 ## Принцип
 
 Мінімальний достатній тестовий обсяг = **змінений код + його безпосередні залежності + ризик регресії**. Не запускати повний browser-suite без причини.
+
+### Оновлення огляду
+
+`presentation.spec.cjs`: дата/діапазон і Enter, прибрана навігація, «Приховані» та деталі, кругла структура, вибір БпС через мініграфік, баланс позицій, клік реальної точки графіка, послідовність складання й подальшого scroll. Для поточного етапу користувач передав ручні візуальні перевірки собі; додаткові desktop/tablet/mobile ревізії не проводяться.

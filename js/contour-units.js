@@ -64,7 +64,7 @@ function saveStatuses(storage,statuses){
   try{storage?.setItem(STORAGE_KEY,JSON.stringify(statuses))}catch{}
 }
 
-let data=null,catalog={nodes:[],index:Object.create(null),roots:[],unconfigured:[]},statuses={},showArchived=false;
+let data=null,catalog={nodes:[],index:Object.create(null),roots:[],unconfigured:[]},statuses={},showArchived=false,showHidden=false;
 const expanded=new Set(),toggling=new Set();
 let refreshQueued=false,observer=null,detailObserver=null;
 const storage=typeof localStorage!=='undefined'?localStorage:null;
@@ -80,7 +80,7 @@ function setData(next){data=next;catalog=buildCatalog(next);expanded.clear();req
 function nodeOf(name){return catalog.index[clean(name)]||null}
 function parentChain(node){const chain=[];let current=node;const guard=new Set();while(current?.parent&&catalog.index[current.parent]&&!guard.has(current.parent)){guard.add(current.parent);current=catalog.index[current.parent];chain.unshift(current)}return chain}
 function visibleByStatus(node){const status=statusOf(node.name);return status!==STATUS.HIDDEN&&(status!==STATUS.ARCHIVED||showArchived)}
-function visibleNode(node){if(!visibleByStatus(node))return false;for(const parent of parentChain(node)){if(!visibleByStatus(parent)||!expanded.has(parent.name))return false}return true}
+function visibleNode(node){if(showHidden)return node.unconfigured||statusOf(node.name)===STATUS.HIDDEN;if(node.unconfigured)return false;if(!visibleByStatus(node))return false;for(const parent of parentChain(node)){if(!visibleByStatus(parent)||!expanded.has(parent.name))return false}return true}
 function isLastSibling(node){if(!node?.parent)return true;const siblings=catalog.index[node.parent]?.children||[];return siblings.at(-1)===node.name}
 function descendants(name){const result=[],stack=[...(catalog.index[name]?.children||[])];while(stack.length){const child=stack.shift(),node=catalog.index[child];if(!node)continue;result.push(child);stack.unshift(...node.children)}return result}
 function visibleDescendantRows(name){const names=new Set(descendants(name));return [...document.querySelectorAll('#table-body tr')].filter(row=>names.has(row.dataset.unitName)&&!row.hidden)}
@@ -88,8 +88,9 @@ function visibleDescendantRows(name){const names=new Set(descendants(name));retu
 function isOpsTable(){return document.querySelector('#table-head th:first-child')?.textContent.trim()==='Угруповання'}
 function ensureControls(){
   const heading=document.querySelector('.details-panel .panel-heading');if(!heading||document.querySelector('#unit-controls'))return;
-  const controls=document.createElement('div');controls.id='unit-controls';controls.className='unit-controls';controls.innerHTML='<button type="button" class="text-button" id="unit-archive-toggle" aria-pressed="false">Архів</button><button type="button" class="text-button" id="unit-manage">Підрозділи <span>↗</span></button>';
+  const controls=document.createElement('div');controls.id='unit-controls';controls.className='unit-controls';controls.innerHTML='<button type="button" class="text-button" id="unit-hidden-toggle" aria-pressed="false">Приховані</button><button type="button" class="text-button" id="unit-archive-toggle" aria-pressed="false">Архів</button><button type="button" class="text-button" id="unit-manage">Підрозділи <span>↗</span></button>';
   const exportButton=document.querySelector('#export-button');heading.insertBefore(controls,exportButton||null);
+  controls.querySelector('#unit-hidden-toggle').onclick=()=>{showHidden=!showHidden;requestRefresh()};
   controls.querySelector('#unit-archive-toggle').onclick=()=>{showArchived=!showArchived;requestRefresh()};
   controls.querySelector('#unit-manage').onclick=()=>{renderManager();document.querySelector('#unit-manager-dialog')?.showModal()};
 }
@@ -166,6 +167,7 @@ async function toggle(name){
 }
 function applyTableState(){
   if(typeof document==='undefined')return[];ensureControls();ensureDialog();const controls=document.querySelector('#unit-controls');if(controls)controls.hidden=!isOpsTable();if(!isOpsTable())return[];
+  const hiddenToggle=document.querySelector('#unit-hidden-toggle');if(hiddenToggle){hiddenToggle.setAttribute('aria-pressed',String(showHidden));const count=catalog.nodes.filter(n=>n.unconfigured||statusOf(n.name)===STATUS.HIDDEN).length;hiddenToggle.textContent='Приховані'+(count?' · '+count:'')}
   const archiveToggle=document.querySelector('#unit-archive-toggle');if(archiveToggle){archiveToggle.setAttribute('aria-pressed',String(showArchived));const count=catalog.nodes.filter(n=>statusOf(n.name)===STATUS.ARCHIVED).length;archiveToggle.textContent=`Архів${count?' · '+count:''}`}
   const sourceRows=[...document.querySelectorAll('#table-body tr')];for(const row of sourceRows){const name=clean(row.querySelector('.row-name')?.textContent),node=nodeOf(name);if(node)decorateRow(row,node)}
   const rows=reorderRows(sourceRows);

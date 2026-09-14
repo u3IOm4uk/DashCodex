@@ -59,14 +59,14 @@ Safety cap може обмежити `days/series`, але `raw/rows/totals` з�
 
 ## Ієрархія підрозділів
 
-`contour-units.js` підключається після `contour-data.js` і обгортає `ContourData.parse()`: після успішного parse будується окремий каталог з усіх GOCh records.
+`contour-units.js` підключається після `contour-data.js` та отримує прийняту модель через явний `setData()`: будується окремий каталог з усіх GOCh records.
 
 Parent-зв’язки не виводяться з Excel. `buildCatalog()` зіставляє точну назву row з `UNIT_HIERARCHY`:
 
 1. конфігурація розгортається у map `name → parent/level/order`;
 2. вузли, присутні у GOCh і конфігурації, отримують тільки configured parent та level;
 3. Excel row order, шаблон `АК` та інші heuristics не використовуються для parent;
-4. назва, відсутня в `UNIT_HIERARCHY`, стає `unconfigured` root і явно позначається у UI;
+4. назва, відсутня в `UNIT_HIERARCHY`, стає `unconfigured` root і доступна лише в поданні «Приховані»;
 5. `units.spec.cjs` перевіряє синтетичну ієрархію/невизначений вузол; вимоги порожнього bundled `catalog.unconfigured` у ньому немає. Фактичне охоплення — CURRENT_STATE / аудит A06.
 
 В основному огляді ієрархія керує представленням flat table та direct-child деталізацією. `+ / −` окремо керує expand/collapse, натискання назви викликає існуючі деталі. Батьківський numeric row не реконструюється з дітей.
@@ -158,3 +158,9 @@ Comparison chart має власний ApexCharts lifecycle. Режим `normali
 Wide review потрібен для `WORKBOOK_SCHEMA`, aggregate/cache semantics, null/date policy, CSV, global sticky/responsive DOM, `UNIT_HIERARCHY` contract або зміни meaning `active/hidden/archived`.
 
 Велика книга все ще парситься у main thread; actual performance budget на target devices не встановлено.
+
+## Огляд: дата, структура й складання БпС
+
+`contour.js` керує нативним period-dialog і спільним застосуванням облікових дат. Chart click зіставляє dataPointIndex з поточним вікном графіка; wheel/presets не змінюють облікові межі. Для балансу позицій series перевпорядковуються тільки в presentation-шарі.
+
+`ContourCharts.distributionDonut()` формує SVG з зовнішніми підписами й використовує той самий знаменник, що смуги. `contour-units.js` перемикає видимість unconfigured/hidden без зміни source records. Під час складання БпС flow-відступ узгоджується зі sticky-зміщенням, після завершення фіксується: подальший scroll переміщує нижні панелі під ряд.

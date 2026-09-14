@@ -33,6 +33,22 @@ function periodRange(dates,range,count,anchor=.5){
  return {from:iso(left),to:iso(left+(length-1)*day)};
 }
 
-root.ContourCharts={modeLabel,baseOptions,temporalOptions,miniBar,periodRange};
+function distributionDonut(rows,{fmt,esc}){
+ const total=rows.reduce((sum,row)=>sum+row.value,0);
+ if(!total)return '<p class="focus-note">Немає додатних значень для круглого розподілу.</p>';
+ let angle=-Math.PI/2;const radius=70,cx=200;
+ const slices=rows.filter(row=>row.value>0).map(row=>{const start=angle,end=angle+row.value/total*Math.PI*2;angle=end;return {...row,start,end,mid:(start+end)/2}});
+ const sides=[slices.filter(s=>Math.cos(s.mid)<0),slices.filter(s=>Math.cos(s.mid)>=0)];
+ const height=Math.max(280,Math.max(...sides.map(side=>side.length))*56+32),cy=height/2;
+ const point=(r,a)=>[cx+r*Math.cos(a),cy+r*Math.sin(a)];
+ const arcs=slices.map(row=>{const a=point(radius,row.start),b=point(radius,row.end),label=esc(row.name)+' · '+fmt(row.value)+' · '+fmt(row.value/total*100)+'%';return slices.length===1?`<circle cx="${cx}" cy="${cy}" r="${radius}" fill="${row.color}"><title>${label}</title></circle>`:`<path d="M${cx},${cy} L${a} A${radius},${radius} 0 ${row.end-row.start>Math.PI?1:0} 1 ${b} Z" fill="${row.color}" stroke="#191e20" stroke-width="2"><title>${label}</title></path>`}).join('');
+ const callouts=sides.flatMap((side,right)=>side.sort((a,b)=>Math.sin(a.mid)-Math.sin(b.mid)).map((row,i)=>{
+  const y=(height-side.length*56)/2+i*56+24,start=point(radius+3,row.mid),elbow=point(radius+15,row.mid),x=right?392:8,edge=right?300:100;
+  const words=row.name.split(' '),lines=[''];for(const word of words){if((lines.at(-1)+' '+word).trim().length>15&&lines.at(-1))lines.push(word);else lines[lines.length-1]=(lines.at(-1)+' '+word).trim()}
+  return `<g class="donut-callout"><polyline points="${start} ${elbow} ${edge},${y} ${right?x-4:x+4},${y}" fill="none" stroke="${row.color}" stroke-width="1"/><text x="${x}" y="${y-8}" text-anchor="${right?'end':'start'}" fill="#d4dcde" font-size="12">${lines.map((line,j)=>`<tspan x="${x}" dy="${j?14:0}">${esc(line)}</tspan>`).join('')}<tspan x="${x}" dy="16" fill="${row.color}" font-weight="600">${fmt(row.value/total*100)}%</tspan></text></g>`;
+ })).join('');
+ return `<svg viewBox="0 0 400 ${height}" role="img" aria-label="Круглий розподіл показника"><g>${arcs}</g><circle cx="${cx}" cy="${cy}" r="43" fill="#191e20"/><text x="${cx}" y="${cy+5}" text-anchor="middle" fill="#b6c1c3" font-size="14">100%</text>${callouts}</svg>`;
+}
+root.ContourCharts={modeLabel,baseOptions,temporalOptions,miniBar,periodRange,distributionDonut};
 if(typeof module!=='undefined')module.exports=root.ContourCharts;
 })(typeof window!=='undefined'?window:globalThis);

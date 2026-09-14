@@ -4,24 +4,23 @@ const S=ContourSource,D=ContourData,C=ContourConfig,V=ContourView,H=ContourChart
 const {esc,fmt,shortDate,fullDate,icon}=V;
 $$('[data-icon]').forEach(el=>el.innerHTML=icon(el.dataset.icon));
 let data,sections,section,category,from,to,chartType='area',charts=[],current,tableRows=[],source=C.source(C.APP_CONFIG.sourceKinds.BUNDLED,C.APP_CONFIG.defaultWorkbook),generation=0;
-let distributionIndex=0,graphMode='dynamics',detailChart=null,detailObserver=null;
+let distributionView='bars',distributionIndex=0,graphMode='dynamics',detailChart=null,detailObserver=null;
 let mainPlotWindow=null,mainPeriodDispose=null,detailPeriodDispose=null;
 const droneModes={};let suppressRailClick=false,categorySizeLock=null,returningToTop=false;
 const splitCategory=c=>['assault','ongoing','territory','losses','positions','drones'].includes(c.id)&&c.fields.length>1;
 $('#analysis-grid').insertAdjacentHTML('beforebegin','<div id="drone-anchor"></div><section id="drone-types" class="panel drone-types" aria-label="Типи БпС противника" hidden></section>');
 $('#distribution-subtitle').insertAdjacentHTML('afterend','<div id="distribution-controls" class="distribution-controls"></div>');
-$('#distribution-legend').insertAdjacentHTML('beforebegin','<p id="distribution-coverage" class="distribution-coverage" hidden></p>');
 const groupNames=[...C.GROUP_NAMES];
 const groupLabel=n=>n.replace('УВ (с) ','').replaceAll('"','');
 const palette=[D.colors.gold,D.colors.blue,D.colors.red,D.colors.green,D.colors.violet,D.colors.cyan,'#8e9ba1'];
 function notify(message){$('#toast').textContent=message;$('#toast').classList.add('show');clearTimeout(notify.timer);notify.timer=setTimeout(()=>$('#toast').classList.remove('show'),3200)}
 function empty(el,text='Немає даних за цей період',note='Змініть період або завантажте іншу книгу.'){el.innerHTML=`<div class="empty">${esc(text)}<small>${esc(note)}</small></div>`}
 function chartError(el,error){console.error(error);empty(el,'Не вдалося побудувати графік','Табличні дані залишаються доступними. Спробуйте змінити період або категорію.')}
-function setRange(days=7){mainPlotWindow=null;const dates=data.sheets[section.sheet].dates;to=dates.at(-1);from=days==='all'?dates[0]:D.shift(to,-Number(days)+1);$('#from').value=from;$('#to').value=to;$$('[data-days]').forEach(b=>b.classList.toggle('active',b.dataset.days===String(days)))}
+function setRange(days=7){mainPlotWindow=null;const dates=data.sheets[section.sheet].dates;to=dates.at(-1);from=days==='all'?dates[0]:D.shift(to,-Number(days)+1);$('#from').value=from;$('#to').value=to;syncPeriodLabel();$$('[data-days]').forEach(b=>b.classList.toggle('active',b.dataset.days===String(days)))}
 function selectSection(id){distributionIndex=0;section=sections.find(s=>s.id===id)||sections[0];category=section.categories[0];setRange(7);render()}
 function selectCategory(id){
  categorySizeLock=document.body.classList.contains('cards-away');returningToTop=scrollY>0;
- distributionIndex=0;graphMode=id==='territory'?'balance':'dynamics';const wasOpen=$('#navigation-dialog').open;category=section.categories.find(c=>c.id===id)||section.categories[0];if(category.id==='drones')category=droneCategory({id:'other'});
+ distributionIndex=0;graphMode=['territory','positions'].includes(id)?'balance':'dynamics';const wasOpen=$('#navigation-dialog').open;category=section.categories.find(c=>c.id===id)||section.categories[0];if(category.id==='drones')category=droneCategory({id:'other'});
  if(wasOpen)$('#navigation-dialog').close();render();followCategory();ContourNavigation.scrollCategory();dockScroll();
 }
 function navigation(){
@@ -35,19 +34,15 @@ function sparkX(length){const r=D.contextRange(data.sheets[section.sheet].dates,
 const signed=v=>v===null?'—':(v>0?'+':'')+fmt(v);
 function percentNote(a,p,i){const c=D.change(a.totals[i],p.totals[i],a.complete&&p.complete);return c.percent===null?(c.delta===null?'Немає бази порівняння':'База попереднього періоду: 0'):signed(c.percent)+'% до попереднього періоду'}
 function changeBadge(a,p,i){const c=D.change(a.totals[i],p.totals[i],a.complete&&p.complete),label=c.percent===null?(c.delta===null?'Немає порівняння':'База: 0'): `${c.percent>0?'↗':c.percent<0?'↘':'→'} ${c.percent>0?'+':''}${fmt(c.percent)}%`;return `<span class="change-badge" title="${esc(percentNote(a,p,i))}" aria-label="${esc(percentNote(a,p,i))}">${label}</span>`}
-function metrics(){const row=$('#metrics'),previousScroll=row.scrollLeft;row.innerHTML=section.categories.map((c,i)=>{
+function metrics(){const row=$('#metrics'),previousScroll=row.scrollLeft;row.innerHTML=section.categories.map(c=>{
  if(c.id==='drones')c={...c,fields:['FPV-дрони',C.WORKBOOK_SCHEMA.fields.ops.dronesOther],labels:['FPV','Інші БпС'],colors:['#e58caf',D.colors.gold]};
  const a=D.aggregate(data,section,c,from,to),range=D.contextRange(data.sheets[section.sheet].dates,from,to),plot=D.aggregate(data,section,c,range.from,range.to),prev=D.aggregate(data,section,c,D.shift(from,-a.days.length),D.shift(from,-1)),paired=splitCategory(c),indices=paired?[0,1]:[0];
  const balance=c.id==='territory'?(a.totals.every(v=>v!==null)?a.totals[0]-a.totals[1]:null):null;
- return `<button class="metric-card ${paired?'metric-card-paired ':''}${category.id===c.id?'active':''}" data-metric="${c.id}" aria-pressed="${category.id===c.id}"><span class="metric-top">${esc(c.name)}</span><div class="card-stats ${paired?'paired':''}">${indices.map(j=>`<div style="--series-color:${c.colors[j]}"><span class="stat-label">${paired||c.fields.length>1?esc(c.labels[j]):'За період'}</span><span class="stat-value"><strong>${fmt(a.totals[j])}</strong>${c.id!=='territory'?changeBadge(a,prev,j):''}</span></div>`).join('')}</div><div class="card-changes ${paired&&c.id!=='territory'?'paired':''}">${c.id==='territory'?`<span class="change-badge" title="Відновлено мінус втрачено">Δ ${signed(balance)} <small>баланс територій</small></span>`:''}</div><div class="card-sparks ${paired?'paired':''}">${indices.map(j=>miniTooltip(spark(plot.series[j],c.colors[j]),plot.series[j],plot.days,c.name===c.labels[j]?c.name:c.name+' · '+c.labels[j],c.colors[j])).join('')}</div>${a.present<a.days.length?`<span class="card-missing">${a.present?'Без даних: '+(a.days.length-a.present)+' із '+a.days.length+' днів':'Немає даних за період'}</span>`:''}</button>`;
- }).join('');row.scrollLeft=previousScroll;$$('[data-metric]').forEach(b=>b.onclick=()=>selectCategory(b.dataset.metric));updateRail();}
-function updateRail(){const r=$('#metrics');r.classList.toggle('more-left',r.scrollLeft>3);r.classList.toggle('more-right',r.scrollLeft+r.clientWidth<r.scrollWidth-3);$('#rail-prev').disabled=r.scrollLeft<3;$('#rail-next').disabled=r.scrollLeft+r.clientWidth>=r.scrollWidth-3;}
-function scrollRail(direction){const r=$('#metrics'),cards=[...r.children],edge=r.getBoundingClientRect().left;const target=direction>0?cards.find(c=>c.getBoundingClientRect().left>edge+12):cards.reverse().find(c=>c.getBoundingClientRect().left<edge-12);if(target)r.scrollBy({left:target.getBoundingClientRect().left-edge-4,behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'});}
-$('#metrics').addEventListener('scroll',updateRail,{passive:true});$('#rail-prev').onclick=()=>scrollRail(-1);$('#rail-next').onclick=()=>scrollRail(1);$('#all-categories').onclick=()=>$('#navigation-dialog').showModal();
+ return '<button class="metric-card '+(paired?'metric-card-paired ':'')+(category.id===c.id?'active':'')+'" data-metric="'+c.id+'" aria-pressed="'+(category.id===c.id)+'"><span class="metric-top">'+esc(c.name)+'</span><div class="card-stats '+(paired?'paired':'')+'">'+indices.map(j=>'<div class="metric-series" style="--series-color:'+c.colors[j]+'"><div class="metric-numbers"><span class="stat-label">'+(paired||c.fields.length>1?esc(c.labels[j]):'За період')+'</span><span class="stat-value"><strong>'+fmt(a.totals[j])+'</strong>'+(c.id!=='territory'?changeBadge(a,prev,j):'')+'</span></div><div class="metric-trend">'+miniTooltip(spark(plot.series[j],c.colors[j]),plot.series[j],plot.days,c.name===c.labels[j]?c.name:c.name+' · '+c.labels[j],c.colors[j])+'</div></div>').join('')+'</div>'+(c.id==='territory'?'<span class="metric-balance" title="Відновлено мінус втрачено">Δ '+signed(balance)+'</span>':'')+(a.present<a.days.length?'<span class="card-missing">'+(a.present?'Без даних: '+(a.days.length-a.present)+' із '+a.days.length+' днів':'Немає даних за період')+'</span>':'')+'</button>';
+ }).join('');row.scrollLeft=previousScroll;$$('[data-metric]').forEach(b=>b.onclick=()=>selectCategory(b.dataset.metric));}
 function followCategory(){const r=$('#metrics'),cards=[...r.children],i=cards.findIndex(c=>c.dataset.metric===category.id);if(i<0)return;const bounds=r.getBoundingClientRect(),box=cards[i].getBoundingClientRect();const ahead=cards.slice(i+1).filter(c=>c.getBoundingClientRect().right<=bounds.right).length;let dx=0;if(box.left<bounds.left)dx=box.left-bounds.left-4;else if(box.right>bounds.right||ahead<=2){const next=cards[Math.min(cards.length-1,i+3)];dx=box.right>bounds.right?box.right-bounds.right+4:Math.max(0,Math.min(next.getBoundingClientRect().right-bounds.right+4,box.left-bounds.left-4))}if(dx)r.scrollBy({left:dx,behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'})}
 function dragRail(rail){let drag=null;rail.addEventListener('pointerdown',e=>{if(e.pointerType!=='mouse'||e.button!==0)return;drag={id:e.pointerId,x:e.clientX,left:rail.scrollLeft,moved:false};});rail.addEventListener('pointermove',e=>{if(!drag)return;const dx=e.clientX-drag.x;if(Math.abs(dx)>6&&!drag.moved){drag.moved=true;rail.setPointerCapture(e.pointerId);rail.classList.add('is-dragging')}if(drag.moved){e.preventDefault();rail.scrollLeft=drag.left-dx}});const end=()=>{if(!drag)return;if(drag.moved){suppressRailClick=true;setTimeout(()=>{suppressRailClick=false},0)}rail.classList.remove('is-dragging');drag=null};rail.addEventListener('pointerleave',()=>{if(drag&&!drag.moved)drag=null});rail.addEventListener('pointerup',end);rail.addEventListener('pointercancel',end);rail.addEventListener('lostpointercapture',end);rail.addEventListener('click',e=>{if(suppressRailClick){e.preventDefault();e.stopImmediatePropagation()}},true);rail.addEventListener('dragstart',e=>e.preventDefault());}
 dragRail($('#metrics'));
-$('#metrics').addEventListener('transitionend',e=>{if(e.target===$('#metrics')&&e.propertyName==='height')updateRail()});
 function droneCategory(type){const base=section.categories.find(c=>c.id==='drones');if(type?.id==='other')return {...base,name:'БпС без FPV',fields:[C.WORKBOOK_SCHEMA.fields.ops.dronesOther],labels:['Інші БпС (без FPV)'],colors:[D.colors.gold],droneType:'other'};return type?{...base,name:'БпС · '+type.name,fields:[type.field],labels:[type.name],colors:[type.color],droneType:type.id}:base}
 function droneBreakdown(){return D.droneTypes.map(type=>({...type,value:D.aggregate(data,section,droneCategory(type),from,to).totals[0]}))}
 function miniChart(values,color,mode,days,label){
@@ -96,18 +91,20 @@ function mountPlotPeriod(host,initial,onChange,currentRange=initial){
 const modeLabel=H.modeLabel;
 function renderDroneTypes(){
  const panel=$('#drone-types'),previousScroll=panel.querySelector('.drone-type-grid')?.scrollLeft||0;
- panel.hidden=category.id!=='drones';$('#drone-anchor').hidden=panel.hidden;if(panel.hidden){panel.innerHTML='';panel.classList.remove('drone-compact');return}
+ panel.hidden=category.id!=='drones';$('#drone-anchor').hidden=panel.hidden;if(panel.hidden){panel.innerHTML='';panel.classList.remove('drone-compact','drone-row');panel.style.removeProperty('margin-bottom');return}
  const rows=droneBreakdown(),all=D.aggregate(data,section,droneCategory(),from,to).totals[0],typed=D.sum(rows.map(r=>r.value)),difference=all!==null&&typed!==null?all-typed:null;
  const cards=[rows.find(r=>r.id==='fpv'),...rows.filter(r=>r.id!=='fpv')],cache=new Map();
- panel.innerHTML=`<div class="drone-heading"><div><h3>Типи БпС <span>· усього ${fmt(all)}</span></h3><p>FPV має окремий масштаб.</p></div><button id="drone-overview" class="text-button">Огляд без FPV</button></div><div class="drone-type-grid">${cards.map(r=>{
+ panel.innerHTML=`<div class="drone-heading"><div><h3>Типи БпС <span>· усього ${fmt(all)}</span></h3></div><button id="drone-overview" class="text-button">Огляд без FPV</button></div><div class="drone-type-grid">${cards.map(r=>{
  const cat=droneCategory(r),a=D.aggregate(data,section,cat,from,to),prev=D.aggregate(data,section,cat,D.shift(from,-a.days.length),D.shift(from,-1)),range=D.contextRange(data.sheets[section.sheet].dates,from,to),plot=D.aggregate(data,section,cat,range.from,range.to),days=plot.days,raw=plot.series[0],mode=droneModes[r.id]||'area';cache.set(r.id,{r,days,raw});
  return `<article class="drone-type ${category.droneType===r.id?'active':''}" style="--type-color:${r.color}" data-drone-card="${r.id}"><button class="drone-select" data-drone="${r.id}" aria-pressed="${category.droneType===r.id}"><span class="drone-type-name">${esc(r.name)}</span><span class="drone-type-number"><span>${fmt(r.value)}</span>${changeBadge(a,prev,0)}</span></button><div class="drone-mini">${miniChart(raw,r.color,mode,days,r.name)}</div><div class="drone-chart-modes" aria-label="Графік: ${esc(r.name)}">${['area','bar'].map(m=>`<button data-mini="${r.id}" data-mode="${m}" aria-label="${esc(r.name)}: ${modeLabel(m)}" aria-pressed="${mode===m}">${icon(m==='area'?'trend':'bars')}</button>`).join('')}</div></article>`;
  }).join('')}</div><p class="drone-source-note">Зміни % — до попереднього періоду. Автомасштаб; вісь може не починатися з нуля.${difference!==null&&Math.abs(difference)>.00001?' Сума типів не збігається із загальним підсумком.':difference===null?' Для звірки типів бракує даних.':''}</p>`;
  $$('[data-drone]').forEach(b=>b.onclick=()=>{category=droneCategory(b.dataset.drone==='other'?{id:'other'}:D.droneTypes.find(t=>t.id===b.dataset.drone));distributionIndex=0;render();$('[data-drone="'+b.dataset.drone+'"]').focus({preventScroll:true})});
+ $$('.drone-mini').forEach(host=>host.onclick=()=>host.closest('.drone-type').querySelector('[data-drone]').click());
  $$('[data-mini]').forEach(b=>b.onclick=()=>{const id=b.dataset.mini,mode=b.dataset.mode,item=cache.get(id),card=b.closest('.drone-type');droneModes[id]=mode;card.querySelector('.drone-mini').innerHTML=miniChart(item.raw,item.r.color,mode,item.days,item.r.name);card.querySelectorAll('[data-mini]').forEach(x=>x.setAttribute('aria-pressed',x===b));});
  $('#drone-overview').onclick=()=>{category=droneCategory({id:'other'});distributionIndex=0;render()};
 }
 function temporalOptions(a,labels,colors,height=260,balance=false,mode=chartType){
+ if(balance&&category.id==='positions')a={...a,series:[a.series[1],a.series[0]]};
  return H.temporalOptions({dataApi:D,aggregate:a,labels,colors,height,balance,mode,from,to,fmt,shortDate,fullDate,reducedMotion:matchMedia('(prefers-reduced-motion: reduce)').matches});
 }
 function plotData(group,window=null){const r=window||D.contextRange(data.sheets[section.sheet].dates,from,to);return D.aggregate(data,section,category,r.from,r.to,group)}
@@ -143,24 +140,25 @@ $('#chart-subtitle').textContent=fullDate(from)+' — '+fullDate(to)+' · '+cate
 $('#distribution-controls').innerHTML=splitCategory(category)?category.labels.map((label,i)=>`<button data-distribution="${i}" aria-pressed="${distributionIndex===i}" style="--series-color:${category.colors[i]}">${esc(label)}</button>`).join(''):'';
 $$('[data-distribution]').forEach(b=>b.onclick=()=>{distributionIndex=Number(b.dataset.distribution);render();$('[data-distribution="'+distributionIndex+'"]').focus({preventScroll:true})});
 $('#trend-chart').innerHTML='';const tasks=[];
-const plot=plotData(undefined,mainPlotWindow),balance=category.id==='territory'&&graphMode==='balance';
+const plot=plotData(undefined,mainPlotWindow),balance=['territory','positions'].includes(category.id)&&graphMode==='balance';
 $('.trend-panel h3').textContent='Динаміка за період';
 $('#chart-subtitle').textContent=fullDate(plot.days[0])+' — '+fullDate(plot.days.at(-1))+' · '+category.unit+' · Автомасштаб'+(!balance?' (вісь не обов’язково від 0)':'')+(from===to?' · контекст '+plot.days.length+' днів; обрану добу виділено':'');
 let tabs=$('#graph-tabs');if(!tabs){$('.chart-controls').insertAdjacentHTML('afterbegin','<div id="graph-tabs" class="graph-tabs" role="group" aria-label="Категорія графіка"></div>');tabs=$('#graph-tabs')}
-tabs.hidden=category.id!=='territory';tabs.innerHTML=['dynamics','balance'].map(m=>`<button data-graph="${m}" aria-pressed="${graphMode===m}">${m==='balance'?'Баланс · Δ':'Динаміка'}</button>`).join('');
+tabs.hidden=!['territory','positions'].includes(category.id);tabs.innerHTML=['dynamics','balance'].map(m=>`<button data-graph="${m}" aria-pressed="${graphMode===m}">${m==='balance'?'Баланс · Δ':'Динаміка'}</button>`).join('');
 $$('[data-graph]').forEach(b=>b.onclick=()=>{graphMode=b.dataset.graph;render()});$('.trend-panel .segmented').hidden=false;$$('[data-chart]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.chart===chartType)));
-const host=$('#trend-chart'),mainChart=new ApexCharts(host,temporalOptions(plot,category.labels,category.colors,260,balance));charts.push(mainChart);
+const host=$('#trend-chart');let visiblePlot=plot;const options=temporalOptions(plot,category.labels,category.colors,260,balance);
+options.chart.events={click:(event,ctx,point)=>{const i=point.dataPointIndex;if(i>=0&&visiblePlot.days[i]&&visiblePlot.series.some(series=>series[i]!==null))applyAccountingPeriod(visiblePlot.days[i],visiblePlot.days[i]);}};
+const mainChart=new ApexCharts(host,options);charts.push(mainChart);
 let mainPending=mainChart.render().catch(error=>{if(epoch===generation)chartError(host,error)});tasks.push(mainPending);
 const initial=D.contextRange(data.sheets[section.sheet].dates,from,to);
 mainPeriodDispose=mountPlotPeriod(host,initial,range=>{
- mainPlotWindow=range;const next=plotData(undefined,range);
+ mainPlotWindow=range;const next=plotData(undefined,range);visiblePlot=next;
  $('#chart-subtitle').textContent=fullDate(range.from)+' — '+fullDate(range.to)+' · '+category.unit+' · Період графіка; підсумки за фільтром';
  mainPending=mainPending.then(()=>{if(epoch!==generation)return;return mainChart.updateOptions(temporalOptions(next,category.labels,category.colors,260,balance),true,false)}).catch(error=>{if(epoch===generation)chartError(host,error)});
 },mainPlotWindow||initial);
-if(category.id==='territory')$('#chart-foot').insertAdjacentHTML('beforeend',`<span class="balance-total">Баланс <b>${signed(current.totals.every(v=>v!==null)?current.totals[0]-current.totals[1]:null)}</b> · відновлено − втрачено</span>`);
+if(['territory','positions'].includes(category.id))$('#chart-foot').insertAdjacentHTML('beforeend',`<span class="balance-total">Баланс <b>${signed(current.totals.every(v=>v!==null)?(category.id==='positions'?current.totals[1]-current.totals[0]:current.totals[0]-current.totals[1]):null)}</b> · відновлено − втрачено</span>`);
 const distributionRows=distribution(),hasMissingDistribution=distributionRows.some(r=>r.value===null),dist=distributionRows.filter(r=>r.value!==null&&r.value>=0).sort((a,b)=>b.value-a.value),total=D.sum(dist.map(r=>r.value)),max=Math.max(...dist.map(r=>r.value),1);
-const coverage=$('#distribution-coverage');coverage.hidden=!(section.id==='ops'&&!(category.id==='drones'&&category.droneType==='other')&&dist.length);
-if(!coverage.hidden){const sourceTotal=current.totals[distributionIndex],difference=sourceTotal===null||total===null?null:sourceTotal-total;coverage.textContent='База часток: '+fmt(total)+' · показані угруповання. Загальний рядок: '+fmt(sourceTotal)+'. Різниця: '+fmt(difference)+'. Вузли поза конфігурацією доступні в таблиці.'}
+$('#distribution-donut').hidden=distributionView!=='donut';$('#distribution-legend').hidden=distributionView==='donut';$('#distribution-donut').innerHTML=H.distributionDonut(dist,{fmt,esc});$$('[data-distribution-view]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.distributionView===distributionView));
 $('#distribution-subtitle').textContent=section.id==='compare'?'СОУ та противник':section.id==='personnel'?'Розподіл за днями':category.id==='drones'&&category.droneType==='other'?'Інші БпС · без FPV':category.labels[distributionIndex]+' · за угрупованнями';
 $('#distribution-legend').innerHTML=(dist.length?dist.map(r=>`<div class="distribution-item"><div><span>${esc(r.name)}</span><strong>${fmt(r.value)}</strong><small>${total?fmt(r.value/total*100)+'%':'0%'}</small></div><div class="distribution-track"><i style="--bar:${r.color};width:${r.value/max*100}%"></i></div></div>`).join(''):'<p class="focus-note">Немає даних для розподілу</p>')+(hasMissingDistribution?'<p class="focus-note">Частки розраховано лише за наявними числовими значеннями; пропуски не прирівнюються до нуля.</p>':'');
 if(section.id==='personnel'&&current.rows.length){const latest=[...current.rows].sort((a,b)=>a.date.localeCompare(b.date)).at(-1),key=category.fields[0].replace('_доба','');$('#focus-content').insertAdjacentHTML('beforeend',`<div class="focus-rule"></div><div class="focus-label">Станом на ${fullDate(latest.date)}</div><div class="context-row"><span>З початку року</span><strong>${fmt(D.number(latest[key+'_рік']))}</strong></div><div class="context-row"><span>Накопичений підсумок</span><strong>${fmt(D.number(latest[key+'_всього']))}</strong></div>`)}
@@ -207,9 +205,21 @@ function updateDates(event){
  $$('[data-days]').forEach(b=>b.classList.remove('active'));render();
 }
 $('#from').onchange=updateDates;$('#to').onchange=updateDates;
+function syncPeriodLabel(){$('#period-label').textContent=from===to?fullDate(from):fullDate(from)+' — '+fullDate(to)}
+function applyAccountingPeriod(start,end){const validation=D.validateDateRange(start,end);if(!validation.valid)return validation.reason;from=start;to=end;$('#from').value=from;$('#to').value=to;mainPlotWindow=null;syncPeriodLabel();$$('[data-days]').forEach(b=>b.classList.remove('active'));render();return null}
+let periodMode='day';
+function setPeriodMode(mode){periodMode=mode;$('#period-end-field').hidden=mode==='day';$('#period-title').textContent=mode==='day'?'Обрати дату':'Обрати період';$('#period-start-label').textContent=mode==='day'?'Дата':'Початок періоду';$$('[data-period-mode]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.periodMode===mode))}
+$('#period-open').onclick=()=>{if(!data)return;setPeriodMode('day');$('#period-start').value=to;$('#period-end').value=to;$('#period-error').hidden=true;$('#period-dialog').showModal();$('#period-start').focus()};
+$$('[data-period-mode]').forEach(b=>b.onclick=()=>{setPeriodMode(b.dataset.periodMode);if(periodMode==='range'){$('#period-start').value=from;$('#period-end').value=to}});
+for(const key of ['start','end'])$('#period-'+key).onchange=()=>{if(periodMode==='day')return;const next=D.alignDateRange($('#period-start').value,$('#period-end').value,key==='start'?'from':'to');$('#period-start').value=next.from;$('#period-end').value=next.to};
+function applyPeriodSelection(){const start=$('#period-start').value,end=periodMode==='day'?start:$('#period-end').value,error=applyAccountingPeriod(start,end);if(error){$('#period-error').textContent=error;$('#period-error').hidden=false;return}$('#period-dialog').close()};
+$('#period-dialog form').addEventListener('submit',event=>{event.preventDefault();applyPeriodSelection()});
+$$('[data-period-cancel]').forEach(b=>b.onclick=()=>$('#period-dialog').close());
+$$('[data-distribution-view]').forEach(b=>b.onclick=()=>{distributionView=b.dataset.distributionView;render()});
+
 $$('[data-chart]').forEach(b=>b.onclick=()=>{chartType=b.dataset.chart;$$('[data-chart]').forEach(x=>x.classList.toggle('active',x===b));render()});
 const step=n=>{if(!category)return;const c=section.categories;selectCategory(c[(c.findIndex(x=>x.id===category.id)+n+c.length)%c.length].id)};$('#previous').onclick=()=>step(-1);$('#next').onclick=()=>step(1);
-const openNav=()=>{if(data)$('#navigation-dialog').showModal()};$('#mobile-categories').onclick=openNav;$('#mobile-menu').onclick=openNav;$('#source-button').onclick=showSource;$('#mobile-source').onclick=showSource;$('#mobile-overview').onclick=()=>window.scrollTo({top:0,behavior:'smooth'});$('#mobile-dates').onclick=()=>{$('.filterbar').scrollIntoView({behavior:'smooth',block:'center'});$('#from').focus({preventScroll:true})};
+const openNav=()=>{if(data)$('#navigation-dialog').showModal()};$('#mobile-menu').onclick=openNav;$('#source-button').onclick=showSource;$('#mobile-source').onclick=showSource;$('#mobile-overview').onclick=()=>window.scrollTo({top:0,behavior:'smooth'});$('#mobile-dates').onclick=()=>{$('#period-open').click()};
 $$('.close-dialog').forEach(b=>b.onclick=()=>b.closest('dialog').close());$$('dialog').forEach(d=>d.addEventListener('click',e=>{if(e.target===d){const r=d.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)d.close()}}));
 let touch;$('.analysis-heading').addEventListener('touchstart',e=>{touch=[e.touches[0].clientX,e.touches[0].clientY]},{passive:true});$('.analysis-heading').addEventListener('touchend',e=>{if(!touch)return;const dx=e.changedTouches[0].clientX-touch[0],dy=e.changedTouches[0].clientY-touch[1];if(Math.abs(dx)>60&&Math.abs(dx)>Math.abs(dy)*1.5)step(dx<0?1:-1);touch=null},{passive:true});
 $('#export-button').onclick=()=>{if(!current?.present){notify('Немає даних для експорту.');return}const quote=v=>'"'+String(v??'').replace(/^[=+@-]/,"'$&").replaceAll('"','""')+'"';const rows=[['Категорія',category.name],['Період',from,to],['Назва',...category.labels],...tableRows.map(r=>[r.name,...r.values.map(v=>v===null?'':v)])];const blob=new Blob(['\ufeff'+rows.map(r=>r.map(quote).join(';')).join('\r\n')],{type:'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=`Контур_${category.droneType||category.id}_${from}_${to}.csv`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);notify('CSV підготовлено')};
@@ -226,7 +236,11 @@ function arrangeDroneRow(panel,singleRow){
 }
 function compressDrones(target){
  droneTarget=target;if(droneFrame)return;
- const tick=()=>{const panel=$('#drone-types'),reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;droneProgress=reduced?droneTarget:droneProgress+(droneTarget-droneProgress)*.18;if(Math.abs(droneTarget-droneProgress)<.001)droneProgress=droneTarget;panel.style.setProperty('--drone-collapse',droneProgress);panel.classList.toggle('drone-compact',droneProgress>=.995);arrangeDroneRow(panel,droneTarget>=.995&&droneProgress>=.98);panel.querySelectorAll('.drone-chart-modes').forEach(el=>el.inert=droneProgress>=.95);droneFrame=droneProgress===droneTarget?0:requestAnimationFrame(tick)};
+ const tick=()=>{const panel=$('#drone-types'),reduced=matchMedia('(prefers-reduced-motion: reduce)').matches,wasComplete=droneProgress===1;droneProgress=reduced?droneTarget:droneProgress+(droneTarget-droneProgress)*.18;if(Math.abs(droneTarget-droneProgress)<.001)droneProgress=droneTarget;panel.style.setProperty('--drone-collapse',droneProgress);panel.classList.toggle('drone-compact',droneProgress>=.995);arrangeDroneRow(panel,droneTarget>=.995&&droneProgress>=.98);panel.querySelectorAll('.drone-chart-modes').forEach(el=>el.inert=droneProgress>=.95);
+ // Keep the following panels below the moving sticky card until folding finishes.
+ // Once folded, the retained flow offset lets subsequent scrolling pass underneath.
+ if(!wasComplete||droneTarget<1){const offset=Math.max(0,panel.getBoundingClientRect().top-$('#drone-anchor').getBoundingClientRect().top);panel.style.marginBottom=(16+offset)+'px'}
+ droneFrame=droneProgress===droneTarget?0:requestAnimationFrame(tick)};
  droneFrame=requestAnimationFrame(tick);
 }
 function dockScroll(){
@@ -242,7 +256,7 @@ addEventListener('scroll',()=>{if(!scrolling){scrolling=true;requestAnimationFra
 addEventListener('scrollend',e=>{if(e.target===document){returningToTop=false;dockScroll()}});
 addEventListener('wheel',()=>{returningToTop=false},{passive:true});
 addEventListener('touchmove',()=>{returningToTop=false},{passive:true});
-addEventListener('resize',()=>{dockScroll();updateRail()});new ResizeObserver(()=>dockScroll()).observe($('#workspace-dock'));dockScroll();
+addEventListener('resize',()=>{dockScroll()});new ResizeObserver(()=>dockScroll()).observe($('#workspace-dock'));dockScroll();
 
 const clock=()=>$('#clock').textContent=new Intl.DateTimeFormat('uk-UA',{hour:'2-digit',minute:'2-digit',timeZone:'Europe/Kyiv'}).format(new Date());clock();setInterval(clock,30000);
 try{await load(async()=>{const response=await fetch(encodeURI(C.APP_CONFIG.defaultWorkbook));if(!response.ok)throw new Error('Файл недоступний');return response.arrayBuffer()},C.APP_CONFIG.defaultWorkbook,C.APP_CONFIG.sourceKinds.BUNDLED)}catch(e){$('#source-label').textContent='Книгу не підключено';empty($('#metrics'),'Підключіть книгу Excel',`Натисніть «Імпорт Excel» і виберіть «${C.APP_CONFIG.defaultWorkbook}».`);$('#notice').hidden=false;$('#notice').textContent='Автоматичне завантаження недоступне. Скористайтеся імпортом Excel.';console.error(e)}
