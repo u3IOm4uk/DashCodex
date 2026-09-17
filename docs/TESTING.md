@@ -16,7 +16,7 @@ Playwright/npm потрібні лише для тестової інфраст�
 npm ci
 npx playwright install chromium
 node --test tests/unit/*.test.cjs
-node .audit/verify-contour.cjs
+node scripts/verify-contour.cjs
 npx playwright test
 ```
 
@@ -29,7 +29,7 @@ npx playwright test
 | лише docs | без runtime/browser tests |
 | first-party JS | `node --check` тільки змінених JS |
 | `index.html` / resource-version script | `scripts/resource-version.cjs --check`; HTML також перевіряється `scripts/check-inline.cjs` |
-| `contour-config`, `contour-data`, `contour-source`, workbook, adapter test | `.audit/verify-contour.cjs` і Node unit tests |
+| `contour-config`, `contour-data`, `contour-source`, workbook, adapter test | `scripts/verify-contour.cjs` і Node unit tests |
 | UI/DOM/CSS/runtime | `tests/browser/core.spec.cjs` |
 | sticky/navigation-related diff | `tests/browser/sticky.spec.cjs` |
 | chart-related diff | `tests/browser/charts.spec.cjs` |
@@ -79,7 +79,7 @@ node scripts/resource-version.cjs 31
 
 ## Regression contract даних
 
-`node .audit/verify-contour.cjs` перевіряє Excel validation, контрольні totals/series/null/0, date policy, comparison/axes, cache/index semantics та pure view/chart helpers. Його запускати, коли зміна може вплинути на модель даних або агрегацію.
+`node scripts/verify-contour.cjs` перевіряє Excel validation, контрольні totals/series/null/0, date policy, comparison/axes, cache/index semantics та pure view/chart helpers. Його запускати, коли зміна може вплинути на модель даних або агрегацію.
 
 ## Browser tests
 

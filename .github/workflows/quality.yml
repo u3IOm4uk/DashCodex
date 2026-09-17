@@ -87,7 +87,7 @@ jobs:
         with:
           node-version: 22
       - name: Data and aggregation regression
-        run: node .audit/verify-contour.cjs
+        run: node scripts/verify-contour.cjs
       - name: Date, source and quality routing contracts
         run: node --test tests/unit/*.test.cjs
 
