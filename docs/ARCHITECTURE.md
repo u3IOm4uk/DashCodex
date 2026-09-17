@@ -22,7 +22,7 @@
 | `css/contour-units.css` | Ієрархічна таблиця, archive/status manager |
 | `css/contour-compare.css` | Трипанельний desktop layout та mobile picker/layout конструктора порівняння |
 | `js/xlsx.full.min.js`, `js/apexcharts.js` | Локальні SheetJS 0.20.3 та ApexCharts 5.15.2 |
-| `.audit/` | Data/regression checks і workbook profiling |
+| `scripts/verify-contour.cjs` | Data/aggregation regression contract |
 | `tests/browser/` | Change-scoped Playwright scenarios |
 | `Запустити.cmd` | Переносимий Windows launcher локального HTTP-сервера |
 
