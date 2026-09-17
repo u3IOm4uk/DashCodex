@@ -36,11 +36,16 @@ if(workspace&&toolbar&&pickers){
 }
 
 const mobileSettings=()=>matchMedia('(max-width:950px)').matches;
+function syncSettingsHeight(){
+ if(!settingsBody)return;
+ settingsBody.style.setProperty('--compare-settings-height',settingsBody.scrollHeight+'px');
+}
 function setSettingsOpen(open){
  if(!settings||!settingsToggle||!settingsBody)return;
+ syncSettingsHeight();
  settings.classList.toggle('is-open',open);
  settingsToggle.setAttribute('aria-expanded',String(open));
- settingsBody.hidden=!open&&mobileSettings();
+ settingsBody.inert=mobileSettings()&&!open;
 }
 if(settingsToggle){
  settingsToggle.addEventListener('click',()=>setSettingsOpen(!settings.classList.contains('is-open')));
@@ -51,9 +56,11 @@ if(settingsToggle){
   previousScroll=current;
  },{passive:true});
  addEventListener('resize',()=>{
-  if(!mobileSettings())settingsBody.hidden=false;
-  else settingsBody.hidden=!settings.classList.contains('is-open');
+  if(!settingsBody)return;
+  syncSettingsHeight();
+  settingsBody.inert=mobileSettings()&&!settings.classList.contains('is-open');
  });
+ new ResizeObserver(()=>syncSettingsHeight()).observe(settingsBody);
 }
 
 const start=field.querySelector('[data-range-start]');
@@ -95,6 +102,7 @@ function syncFromDates(){
  start.value=String(clamp(indexOf(state.min,from.value),0,state.total));
  end.value=String(clamp(indexOf(state.min,to.value),Number(start.value),state.total));
  paint(state);
+ syncSettingsHeight();
 }
 
 function preview(boundary){
@@ -121,13 +129,13 @@ start.addEventListener('change',()=>commit('from'));
 end.addEventListener('change',()=>commit('to'));
 from.addEventListener('change',syncSoon);
 to.addEventListener('change',syncSoon);
-new MutationObserver(()=>{if(dialog.open)syncSoon()}).observe(dialog,{attributes:true,attributeFilter:['open']});
+new MutationObserver(()=>{if(dialog.open){syncSoon();requestAnimationFrame(syncSettingsHeight)}}).observe(dialog,{attributes:true,attributeFilter:['open']});
 const boundsObserver=new MutationObserver(syncSoon);
 boundsObserver.observe(from,{attributes:true,attributeFilter:['min','max']});
 boundsObserver.observe(to,{attributes:true,attributeFilter:['min','max']});
 if(rangeNote)new MutationObserver(syncSoon).observe(rangeNote,{childList:true,subtree:true,characterData:true});
 addEventListener('resize',()=>{if(dialog.open)syncSoon()});
 
-if(settingsBody&&mobileSettings())settingsBody.hidden=!settings.classList.contains('is-open');
+if(settingsBody){syncSettingsHeight();settingsBody.inert=mobileSettings()&&!settings.classList.contains('is-open')}
 syncFromDates();
 })();
