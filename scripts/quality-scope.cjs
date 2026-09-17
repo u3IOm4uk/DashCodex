@@ -9,7 +9,7 @@ function scopeFor(files,patches='',availableSpecs=allBrowserSpecs()){
  const changed=re=>files.some(file=>re.test(file)),patch=re=>re.test(patches);
  const testInfra=changed(/^(\.github\/workflows\/quality\.yml|scripts\/(quality-scope|check-inline|serve)\.cjs|tests\/unit\/|playwright\.config\.cjs|package(?:-lock)?\.json)/);
  const resourceVersion=changed(/^(index\.html|scripts\/resource-version\.cjs)$/);
- const regression=testInfra||changed(/^(js\/contour-(config|data|source)\.js|\.audit\/verify-contour\.cjs|Накопичення\.xlsx)$/);
+ const regression=testInfra||changed(/^(js\/contour-(config|data|source)\.js|scripts\/verify-contour\.cjs|Накопичення\.xlsx)$/);
  const browserCore=testInfra||regression||changed(/^(index\.html|css\/contour.*\.css|js\/contour.*\.js|tests\/browser\/core\.spec\.cjs)$/);
  const browserSticky=testInfra||changed(/^(js\/contour(?:-navigation)?\.js|tests\/browser\/sticky\.spec\.cjs)$/)||patch(/cards-away|workspace-dock|sticky|#metrics/i);
  const browserBps=testInfra||changed(/^(css\/contour-detail\.css|tests\/browser\/bps\.spec\.cjs)$/)||patch(/БпС|FPV|drone/i);
