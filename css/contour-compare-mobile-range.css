@@ -1,4 +1,19 @@
 .compare-mobile-range-field{display:none}
+.compare-mobile-settings,.compare-mobile-settings-body{display:contents}
+.compare-mobile-settings-toggle{display:none}
+
+@media(max-width:950px){
+  .compare-mobile-settings{display:block;position:sticky;top:0;z-index:18;background:#151c1f;border-bottom:1px solid var(--compare-line)}
+  .compare-mobile-settings-toggle{display:flex;width:100%;min-height:42px;align-items:center;justify-content:space-between;padding:9px 12px;border:0;background:#151c1f;color:var(--compare-text);font:inherit;font-size:12px;font-weight:600;letter-spacing:.02em;text-align:left}
+  .compare-mobile-settings-toggle:hover{background:#1a2326}
+  .compare-mobile-settings-toggle:focus-visible{outline:2px solid #dae18e;outline-offset:-3px}
+  .compare-mobile-settings-chevron{color:var(--gold);font-size:17px;line-height:1;transition:transform .15s ease}
+  .compare-mobile-settings:not(.is-open) .compare-mobile-settings-chevron{transform:rotate(-90deg)}
+  .compare-mobile-settings-body{display:block;border-top:1px solid var(--compare-line)}
+  .compare-mobile-settings-body[hidden]{display:none!important}
+  .compare-mobile-settings .compare-mobile-pickers{padding:10px 12px;border-bottom:1px solid var(--compare-line);background:transparent}
+  .compare-mobile-settings .compare-toolbar{padding:10px 12px 12px;border-bottom:0;background:transparent}
+}
 
 @media(max-width:650px){
   .compare-dialog .compare-quick-period-field,.compare-dialog .compare-field:has(.compare-presets){display:none}
