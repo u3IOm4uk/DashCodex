@@ -6,6 +6,9 @@ const from=document.querySelector('#compare-from');
 const to=document.querySelector('#compare-to');
 const presets=dialog?.querySelector('.compare-presets');
 const rangeNote=document.querySelector('#compare-range-note');
+const workspace=dialog?.querySelector('.compare-workspace');
+const toolbar=workspace?.querySelector('.compare-toolbar');
+const pickers=dialog?.querySelector('.compare-mobile-pickers');
 if(!dialog||!from||!to||!presets)return;
 
 const quickField=presets.closest('.compare-field');
@@ -15,6 +18,43 @@ const field=document.createElement('div');
 field.className='compare-field compare-mobile-range-field';
 field.innerHTML='<div class="compare-mobile-range-control"><div class="compare-mobile-range-track" aria-hidden="true"><span class="compare-mobile-range-selection"></span></div><input type="range" data-range-start min="0" max="0" value="0" step="1" aria-label="Початкова дата періоду"><input type="range" data-range-end min="0" max="0" value="0" step="1" aria-label="Кінцева дата періоду"></div>';
 quickField?.after(field);
+
+let settings=null,settingsToggle=null,settingsBody=null;
+if(workspace&&toolbar&&pickers){
+ settings=document.createElement('section');
+ settings.className='compare-mobile-settings is-open';
+ settingsToggle=document.createElement('button');
+ settingsToggle.type='button';
+ settingsToggle.className='compare-mobile-settings-toggle';
+ settingsToggle.setAttribute('aria-expanded','true');
+ settingsToggle.innerHTML='<span>Налаштування</span><span class="compare-mobile-settings-chevron" aria-hidden="true">⌄</span>';
+ settingsBody=document.createElement('div');
+ settingsBody.className='compare-mobile-settings-body';
+ toolbar.before(settings);
+ settings.append(settingsToggle,settingsBody);
+ settingsBody.append(pickers,toolbar);
+}
+
+const mobileSettings=()=>matchMedia('(max-width:950px)').matches;
+function setSettingsOpen(open){
+ if(!settings||!settingsToggle||!settingsBody)return;
+ settings.classList.toggle('is-open',open);
+ settingsToggle.setAttribute('aria-expanded',String(open));
+ settingsBody.hidden=!open&&mobileSettings();
+}
+if(settingsToggle){
+ settingsToggle.addEventListener('click',()=>setSettingsOpen(!settings.classList.contains('is-open')));
+ let previousScroll=workspace.scrollTop;
+ workspace.addEventListener('scroll',()=>{
+  const current=workspace.scrollTop;
+  if(mobileSettings()&&settings.classList.contains('is-open')&&current>8&&Math.abs(current-previousScroll)>1)setSettingsOpen(false);
+  previousScroll=current;
+ },{passive:true});
+ addEventListener('resize',()=>{
+  if(!mobileSettings())settingsBody.hidden=false;
+  else settingsBody.hidden=!settings.classList.contains('is-open');
+ });
+}
 
 const start=field.querySelector('[data-range-start]');
 const end=field.querySelector('[data-range-end]');
@@ -88,5 +128,6 @@ boundsObserver.observe(to,{attributes:true,attributeFilter:['min','max']});
 if(rangeNote)new MutationObserver(syncSoon).observe(rangeNote,{childList:true,subtree:true,characterData:true});
 addEventListener('resize',()=>{if(dialog.open)syncSoon()});
 
+if(settingsBody&&mobileSettings())settingsBody.hidden=!settings.classList.contains('is-open');
 syncFromDates();
 })();
