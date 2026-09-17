@@ -1,0 +1,21 @@
+.compare-mobile-range-field{display:none}
+
+@media(max-width:650px){
+  .compare-dialog .compare-quick-period-field,.compare-dialog .compare-field:has(.compare-presets){display:none}
+  .compare-dialog .compare-mobile-range-field{display:grid;flex:1 1 100%;gap:7px}
+  .compare-mobile-range-field.is-unavailable{opacity:.55;pointer-events:none}
+  .compare-mobile-range-values{display:flex;align-items:center;justify-content:space-between;gap:12px;font-variant-numeric:tabular-nums}
+  .compare-mobile-range-values output{font-size:11px;color:var(--compare-text)}
+  .compare-mobile-range-control{--range-left:0%;--range-right:100%;position:relative;height:34px;touch-action:none}
+  .compare-mobile-range-track{position:absolute;left:11px;right:11px;top:50%;height:4px;transform:translateY(-50%);border-radius:999px;background:#344146;overflow:hidden;pointer-events:none}
+  .compare-mobile-range-selection{position:absolute;top:0;bottom:0;left:var(--range-left);right:calc(100% - var(--range-right));border-radius:inherit;background:var(--gold)}
+  .compare-mobile-range-control input[type=range]{position:absolute;inset:0;width:100%;height:34px;margin:0;padding:0;border:0;background:transparent;appearance:none;-webkit-appearance:none;pointer-events:none}
+  .compare-mobile-range-control input[type=range]::-webkit-slider-runnable-track{height:4px;background:transparent;border:0}
+  .compare-mobile-range-control input[type=range]::-webkit-slider-thumb{width:24px;height:24px;margin-top:-10px;border:2px solid #d8d58a;border-radius:50%;background:#20282b;box-shadow:0 2px 8px #0008;appearance:none;-webkit-appearance:none;pointer-events:auto}
+  .compare-mobile-range-control input[type=range]::-moz-range-track{height:4px;background:transparent;border:0}
+  .compare-mobile-range-control input[type=range]::-moz-range-progress{background:transparent}
+  .compare-mobile-range-control input[type=range]::-moz-range-thumb{width:20px;height:20px;border:2px solid #d8d58a;border-radius:50%;background:#20282b;box-shadow:0 2px 8px #0008;pointer-events:auto}
+  .compare-mobile-range-control input[type=range]:focus-visible{outline:0}
+  .compare-mobile-range-control input[type=range]:focus-visible::-webkit-slider-thumb{outline:2px solid #f1eda0;outline-offset:3px}
+  .compare-mobile-range-control input[type=range]:focus-visible::-moz-range-thumb{outline:2px solid #f1eda0;outline-offset:3px}
+}
