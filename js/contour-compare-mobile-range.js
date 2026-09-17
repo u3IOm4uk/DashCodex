@@ -5,6 +5,7 @@ const dialog=document.querySelector('#compare-dialog');
 const from=document.querySelector('#compare-from');
 const to=document.querySelector('#compare-to');
 const presets=dialog?.querySelector('.compare-presets');
+const rangeNote=document.querySelector('#compare-range-note');
 if(!dialog||!from||!to||!presets)return;
 
 const quickField=presets.closest('.compare-field');
@@ -73,14 +74,19 @@ function commit(boundary){
  requestAnimationFrame(syncFromDates);
 }
 
+const syncSoon=()=>requestAnimationFrame(syncFromDates);
 start.addEventListener('input',()=>preview('from'));
 end.addEventListener('input',()=>preview('to'));
 start.addEventListener('change',()=>commit('from'));
 end.addEventListener('change',()=>commit('to'));
-from.addEventListener('change',()=>requestAnimationFrame(syncFromDates));
-to.addEventListener('change',()=>requestAnimationFrame(syncFromDates));
-new MutationObserver(()=>{if(dialog.open)requestAnimationFrame(syncFromDates)}).observe(dialog,{attributes:true,attributeFilter:['open']});
-addEventListener('resize',()=>{if(dialog.open)requestAnimationFrame(syncFromDates)});
+from.addEventListener('change',syncSoon);
+to.addEventListener('change',syncSoon);
+new MutationObserver(()=>{if(dialog.open)syncSoon()}).observe(dialog,{attributes:true,attributeFilter:['open']});
+const boundsObserver=new MutationObserver(syncSoon);
+boundsObserver.observe(from,{attributes:true,attributeFilter:['min','max']});
+boundsObserver.observe(to,{attributes:true,attributeFilter:['min','max']});
+if(rangeNote)new MutationObserver(syncSoon).observe(rangeNote,{childList:true,subtree:true,characterData:true});
+addEventListener('resize',()=>{if(dialog.open)syncSoon()});
 
 syncFromDates();
 })();
