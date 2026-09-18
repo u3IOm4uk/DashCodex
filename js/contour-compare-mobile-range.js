@@ -45,11 +45,12 @@ function setSettingsOpen(open){
  syncSettingsHeight();
  settings.classList.toggle('is-open',open);
  settingsToggle.setAttribute('aria-expanded',String(open));
+ settingsToggle.tabIndex=mobileSettings()&&open?-1:0;
  settingsBody.inert=mobileSettings()&&!open;
 }
 if(settingsToggle){
  const PULL_START=10,PULL_OPEN=92,PULL_MAX=176;
- let previousScroll=workspace.scrollTop,touchAnchorY=null,pullDistance=0,pulling=false;
+ let touchAnchorY=null,pullDistance=0,pulling=false;
  const clearPullVisual=()=>{
   settings.classList.remove('is-pulling');
   for(const name of ['--compare-settings-pull','--compare-settings-pull-opacity','--compare-settings-pull-shift','--compare-settings-pull-rotation'])settings.style.removeProperty(name);
@@ -102,11 +103,18 @@ if(settingsToggle){
  },{passive:false});
  workspace.addEventListener('touchend',()=>{touchActive=false;finishPull()},{passive:true});
  workspace.addEventListener('touchcancel',()=>{touchActive=false;finishPull()},{passive:true});
- workspace.addEventListener('scroll',()=>{
-  const current=workspace.scrollTop;
-  if(mobileSettings()&&settings.classList.contains('is-open')&&current>8&&Math.abs(current-previousScroll)>1)setSettingsOpen(false);
-  previousScroll=current;
+ workspace.addEventListener('wheel',event=>{
+  if(mobileSettings()&&settings.classList.contains('is-open')&&event.deltaY>2)setSettingsOpen(false);
  },{passive:true});
+ workspace.addEventListener('touchmove',event=>{
+  if(!mobileSettings()||!settings.classList.contains('is-open')||event.touches.length!==1)return;
+  const currentY=event.touches[0].clientY;
+  const previousY=Number(workspace.dataset.compareTouchY||currentY);
+  workspace.dataset.compareTouchY=String(currentY);
+  if(previousY-currentY>3)setSettingsOpen(false);
+ },{passive:true});
+ workspace.addEventListener('touchend',()=>delete workspace.dataset.compareTouchY,{passive:true});
+ workspace.addEventListener('touchcancel',()=>delete workspace.dataset.compareTouchY,{passive:true});
  addEventListener('resize',()=>{
   if(!settingsBody)return;
   clearPullVisual();syncSettingsHeight();
@@ -188,6 +196,6 @@ boundsObserver.observe(to,{attributes:true,attributeFilter:['min','max']});
 if(rangeNote)new MutationObserver(syncSoon).observe(rangeNote,{childList:true,subtree:true,characterData:true});
 addEventListener('resize',()=>{if(dialog.open)syncSoon()});
 
-if(settingsBody){syncSettingsHeight();settingsBody.inert=mobileSettings()&&!settings.classList.contains('is-open')}
+if(settingsBody){syncSettingsHeight();const open=settings.classList.contains('is-open');settingsToggle.tabIndex=mobileSettings()&&open?-1:0;settingsBody.inert=mobileSettings()&&!open}
 syncFromDates();
 })();
