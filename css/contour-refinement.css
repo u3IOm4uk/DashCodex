@@ -191,7 +191,7 @@ main{padding-top:98px}
 #workspace-dock #metrics{mask-image:linear-gradient(90deg,transparent,#000 14px,#000 calc(100% - 14px),transparent);padding-inline:8px;scroll-padding-inline:8px;margin-inline:0}
 @media(min-width:651px){#previous,#next{display:none}}
 .period-selection{display:flex;align-items:center;gap:12px;min-height:42px;padding:8px 12px;border:1px solid #596158;border-radius:6px;background:#202624;color:#e1e5d2;font-size:13px;font-variant-numeric:tabular-nums}
-.period-selection .icon{color:var(--gold);width:18px}.period-selection>span:last-child{color:var(--gold);margin-left:auto}
+.period-selection .icon{color:var(--gold);width:18px}#period-label{display:inline-block;inline-size:23ch;text-align:center}.period-selection>span:last-child{color:var(--gold);margin-left:auto}
 .period-dialog{width:min(460px,calc(100vw - 24px));padding:22px;max-height:calc(100dvh - 32px);overflow:auto}
 .period-dialog .sheet-heading{padding:0;margin-bottom:20px}.period-dialog h2{font-size:21px}
 .period-modes{display:flex;gap:4px;padding:4px;background:#111719;border:1px solid var(--line);border-radius:7px;margin-bottom:20px}
