@@ -58,7 +58,7 @@ if(settingsToggle){
  const showPull=distance=>{
   const resisted=Math.min(PULL_MAX,Math.max(0,distance-PULL_START)*.72);
   const progress=Math.min(1,resisted/PULL_OPEN);
-  pullDistance=resisted;pulling=resisted>0;
+  pullDistance=resisted;pulling=pulling||resisted>0;
   if(!pulling)return;
   settings.classList.add('is-pulling');
   settings.style.setProperty('--compare-settings-pull',resisted+'px');
