@@ -1,0 +1,40 @@
+.compare-mobile-range-field{display:none}
+.compare-mobile-settings,.compare-mobile-settings-body{display:contents}
+.compare-mobile-settings-toggle{display:none}
+
+@media(max-width:950px){
+  .compare-mobile-settings{--compare-settings-pull:0px;--compare-settings-pull-opacity:0;--compare-settings-pull-shift:0px;display:block;position:sticky;top:0;z-index:18;background:#151c1f;border-bottom:1px solid var(--compare-line)}
+  .compare-mobile-settings-toggle{display:flex;width:100%;min-height:42px;align-items:center;justify-content:space-between;padding:9px 12px;border:0;background:#151c1f;color:var(--compare-text);font:inherit;font-size:12px;font-weight:600;letter-spacing:.02em;text-align:left}
+  .compare-mobile-settings-toggle:hover{background:#1a2326}
+  .compare-mobile-settings-toggle:focus-visible{outline:2px solid #dae18e;outline-offset:-3px}
+  .compare-mobile-settings-chevron{color:var(--gold);font-size:17px;line-height:1;transition:transform .58s cubic-bezier(.16,1,.3,1)}
+  .compare-mobile-settings:not(.is-open) .compare-mobile-settings-chevron{transform:rotate(-90deg)}
+  .compare-mobile-settings-body{display:block;max-height:var(--compare-settings-height,520px);overflow:hidden;opacity:1;transform:translateY(0);border-top:1px solid var(--compare-line);transform-origin:top;will-change:max-height,opacity,transform;transition:max-height .62s cubic-bezier(.16,1,.3,1),opacity .46s cubic-bezier(.16,1,.3,1),transform .62s cubic-bezier(.16,1,.3,1),border-color .4s ease}
+  .compare-mobile-settings:not(.is-open) .compare-mobile-settings-body{max-height:var(--compare-settings-pull,0px);opacity:var(--compare-settings-pull-opacity,0);transform:translateY(calc(-10px + var(--compare-settings-pull-shift,0px)));border-top-color:transparent;pointer-events:none}
+  .compare-mobile-settings.is-pulling .compare-mobile-settings-body,.compare-mobile-settings.is-pulling .compare-mobile-settings-chevron{transition:none}
+  .compare-mobile-settings.is-pulling .compare-mobile-settings-chevron{transform:rotate(calc(-90deg + var(--compare-settings-pull-rotation,0deg)))}
+  .compare-mobile-settings .compare-mobile-pickers{padding:10px 12px;border-bottom:1px solid var(--compare-line);background:transparent}
+  .compare-mobile-settings .compare-toolbar{padding:10px 12px 12px;border-bottom:0;background:transparent}
+}
+
+@media(max-width:650px){
+  .compare-dialog .compare-quick-period-field,.compare-dialog .compare-field:has(.compare-presets){display:none}
+  .compare-dialog .compare-mobile-range-field{display:block;flex:1 1 100%}
+  .compare-mobile-range-field.is-unavailable{opacity:.55;pointer-events:none}
+  .compare-mobile-range-control{--range-left:0%;--range-right:100%;position:relative;height:34px;touch-action:none}
+  .compare-mobile-range-track{position:absolute;left:11px;right:11px;top:50%;height:4px;transform:translateY(-50%);border-radius:999px;background:#344146;overflow:hidden;pointer-events:none}
+  .compare-mobile-range-selection{position:absolute;top:0;bottom:0;left:var(--range-left);right:calc(100% - var(--range-right));border-radius:inherit;background:var(--gold)}
+  .compare-mobile-range-control input[type=range]{position:absolute;inset:0;width:100%;height:34px;margin:0;padding:0;border:0;background:transparent;appearance:none;-webkit-appearance:none;pointer-events:none}
+  .compare-mobile-range-control input[type=range]::-webkit-slider-runnable-track{height:4px;background:transparent;border:0}
+  .compare-mobile-range-control input[type=range]::-webkit-slider-thumb{width:24px;height:24px;margin-top:-10px;border:2px solid #d8d58a;border-radius:50%;background:#20282b;box-shadow:0 2px 8px #0008;appearance:none;-webkit-appearance:none;pointer-events:auto}
+  .compare-mobile-range-control input[type=range]::-moz-range-track{height:4px;background:transparent;border:0}
+  .compare-mobile-range-control input[type=range]::-moz-range-progress{background:transparent}
+  .compare-mobile-range-control input[type=range]::-moz-range-thumb{width:20px;height:20px;border:2px solid #d8d58a;border-radius:50%;background:#20282b;box-shadow:0 2px 8px #0008;pointer-events:auto}
+  .compare-mobile-range-control input[type=range]:focus-visible{outline:0}
+  .compare-mobile-range-control input[type=range]:focus-visible::-webkit-slider-thumb{outline:2px solid #f1eda0;outline-offset:3px}
+  .compare-mobile-range-control input[type=range]:focus-visible::-moz-range-thumb{outline:2px solid #f1eda0;outline-offset:3px}
+}
+
+@media(prefers-reduced-motion:reduce){
+  .compare-mobile-settings-body,.compare-mobile-settings-chevron{transition:none!important}
+}

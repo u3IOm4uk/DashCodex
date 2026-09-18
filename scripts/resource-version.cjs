@@ -7,6 +7,7 @@ const resources=[
  'css/contour-refinement.css',
  'css/contour-units.css',
  'css/contour-compare.css',
+ 'css/contour-compare-mobile-range.css',
  'js/contour-config.js',
  'js/contour-data.js',
  'js/contour-units.js',
@@ -14,7 +15,8 @@ const resources=[
  'js/contour-charts.js',
  'js/contour-navigation.js',
  'js/contour.js',
- 'js/contour-compare.js'
+ 'js/contour-compare.js',
+ 'js/contour-compare-mobile-range.js'
 ];
 const escape=value=>value.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
 let html=fs.readFileSync(file,'utf8');
