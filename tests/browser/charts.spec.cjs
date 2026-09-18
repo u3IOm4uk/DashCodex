@@ -63,9 +63,11 @@ test('cross-category comparison builds a shared analytical view with hierarchica
  const checked=page.locator('#compare-catalog [data-compare-metric]:checked');expect(await checked.count()).toBeGreaterThanOrEqual(2);
  const [metricsBox,workspaceBox,unitsBox]=await Promise.all([page.locator('.compare-metrics-panel').boundingBox(),page.locator('.compare-workspace').boundingBox(),page.locator('.compare-units-panel').boundingBox()]);
  expect(metricsBox.x+metricsBox.width).toBeLessThanOrEqual(workspaceBox.x+1);expect(unitsBox.x).toBeGreaterThanOrEqual(workspaceBox.x+workspaceBox.width-1);
- const graphControls=page.locator('.compare-chart-controls');await expect(graphControls).toHaveClass(/segmented/);expect(await graphControls.locator('button').allTextContents()).toEqual(['','']);
+ const graphControls=page.locator('.compare-chart-controls');await expect(graphControls).toHaveClass(/segmented/);expect(await graphControls.locator('button').allTextContents()).toEqual(['','']);await expect(chartToggle.locator('.compare-chart-controls')).toHaveCount(1);await expect(page.locator('.compare-toolbar .compare-chart-controls')).toHaveCount(0);
  const valueControls=page.locator('.compare-value-controls');await expect(valueControls).toHaveClass(/segmented/);
+ await graphControls.locator('[data-compare-chart="bar"]').click();await expect(chartPanel).not.toHaveClass(/is-collapsed/);await expect(chartToggle).toHaveAttribute('aria-expanded','true');
  await detailsHeading.click();await expect(detailsPanel).not.toHaveClass(/is-collapsed/);await expect(chartPanel).toHaveClass(/is-collapsed/);await expect(detailsHeading).toHaveAttribute('aria-expanded','true');await expect(chartToggle).toHaveAttribute('aria-expanded','false');await expect(page.locator('.compare-table-wrap')).toBeVisible();await expect(page.locator('#compare-chart .apexcharts-canvas')).toHaveCount(0);
+ await detailsHeading.click();await expect(detailsPanel).toHaveClass(/is-collapsed/);await expect(detailsHeading).toHaveAttribute('aria-expanded','false');await detailsHeading.click();await expect(detailsPanel).not.toHaveClass(/is-collapsed/);
  await expect(page.locator('#compare-units-all')).toHaveAttribute('aria-pressed','true');
  const parentToggle=page.locator('#compare-unit-tree [data-unit-toggle]').first(),parentRow=parentToggle.locator('xpath=..'),parentNode=parentRow.locator('xpath=..'),parentInput=parentRow.locator('[data-compare-unit]');
  await parentInput.check();await expect(parentInput).toBeChecked();await expect(parentToggle).toHaveAttribute('aria-expanded','true');
@@ -85,12 +87,13 @@ test('cross-category comparison builds a shared analytical view with hierarchica
  const hierarchyTable=page.locator('.compare-table-wrap table');await expect(hierarchyTable).toHaveClass(/detail-hierarchy-table/);await expect(page.locator('#compare-unit-breakdown-note')).toBeVisible();
  const firstBlock=await page.locator('#compare-table-body').evaluate(body=>{const parent=body.querySelector('.detail-unit-parent'),date=parent.querySelector('.detail-unit-date'),span=Number(date.getAttribute('rowspan')),names=[];let row=parent.nextElementSibling;for(let i=1;i<span;i++,row=row.nextElementSibling)names.push(row.dataset.detailUnit);return {parent:parent.dataset.detailUnit,span,names}});
  const parentName=await parentInput.getAttribute('data-compare-unit');expect(firstBlock.parent).toBe(parentName);expect(firstBlock.span).toBe(directChildren.length+1);expect(firstBlock.names).toEqual(directChildren);
- await page.locator('[data-compare-chart="bar"]').click();await expect(page.locator('[data-compare-chart="bar"]')).toHaveAttribute('aria-pressed','true');
+ await page.locator('[data-compare-chart="bar"]').click();await expect(page.locator('[data-compare-chart="bar"]')).toHaveAttribute('aria-pressed','true');await expect(detailsPanel).not.toHaveClass(/is-collapsed/);await expect(chartPanel).toHaveClass(/is-collapsed/);
  await expect(page.locator('#compare-table-body tr').first()).toBeVisible();
  await expect(page.locator('.compare-table-panel')).toHaveClass(/panel/);await expect(page.locator('.compare-table-panel')).toHaveClass(/details-panel/);await expect(page.locator('.compare-table-wrap')).toHaveClass(/table-wrap/);
  const compareWrapMetrics=await page.locator('.compare-table-wrap').evaluate(el=>{const s=getComputedStyle(el),table=el.querySelector('table'),wrapRect=el.getBoundingClientRect(),tableRect=table.getBoundingClientRect();return {maxHeight:s.maxHeight,wrapHeight:wrapRect.height,tableHeight:tableRect.height}});expect(compareWrapMetrics.maxHeight).toBe('none');expect(compareWrapMetrics.wrapHeight).toBeGreaterThanOrEqual(compareWrapMetrics.tableHeight-1);
  const dashboardFrom=await page.locator('#from').inputValue(),dashboardTo=await page.locator('#to').inputValue();await page.locator('#compare-dashboard-period').click();await expect(page.locator('#compare-from')).toHaveValue(dashboardFrom);await expect(page.locator('#compare-to')).toHaveValue(dashboardTo);
  await chartToggle.click();await expect(chartPanel).not.toHaveClass(/is-collapsed/);await expect(detailsPanel).toHaveClass(/is-collapsed/);await expect(page.locator('.compare-table-wrap')).toBeHidden();await expect(page.locator('#compare-chart .apexcharts-canvas')).toBeVisible({timeout:15000});await expect(page.locator('[data-compare-chart="bar"]')).toHaveAttribute('aria-pressed','true');
+ await chartToggle.click();await expect(chartPanel).toHaveClass(/is-collapsed/);await expect(chartToggle).toHaveAttribute('aria-expanded','false');await expect(detailsPanel).toHaveClass(/is-collapsed/);
 });
 
 test('comparison action keeps mobile navigation and opens filters as dropdown overlays',async({page})=>{
@@ -105,9 +108,10 @@ test('comparison action keeps mobile navigation and opens filters as dropdown ov
  const [dialogBox,navBox]=await Promise.all([dialog.boundingBox(),nav.boundingBox()]);expect(dialogBox.y+dialogBox.height).toBeLessThanOrEqual(navBox.y+1);
  const metrics=page.locator('.compare-metrics-panel'),units=page.locator('.compare-units-panel'),workspace=page.locator('.compare-workspace');
  await expect(page.locator('.compare-mobile-pickers')).toBeVisible();await expect(metrics).toBeHidden();await expect(units).toBeHidden();
- const valueField=page.locator('.compare-value-controls').locator('xpath=..'),chartField=page.locator('.compare-chart-controls').locator('xpath=..'),toolbar=page.locator('.compare-toolbar');
- const [valueBox,chartBox,toolbarBox]=await Promise.all([valueField.boundingBox(),chartField.boundingBox(),toolbar.boundingBox()]);
- expect(Math.abs(valueBox.y-chartBox.y)).toBeLessThanOrEqual(1);expect(toolbarBox.x+toolbarBox.width-(chartBox.x+chartBox.width)).toBeLessThanOrEqual(13);
+ const valueField=page.locator('.compare-value-controls').locator('xpath=..'),toolbar=page.locator('.compare-toolbar'),chartHeader=page.locator('#compare-chart-toggle');
+ await expect(toolbar.locator('.compare-chart-controls')).toHaveCount(0);await expect(chartHeader.locator('.compare-chart-controls')).toBeVisible();
+ const [valueBox,toolbarBox]=await Promise.all([valueField.boundingBox(),toolbar.boundingBox()]);
+ expect(valueBox.y).toBeGreaterThanOrEqual(toolbarBox.y-1);expect(valueBox.y+valueBox.height).toBeLessThanOrEqual(toolbarBox.y+toolbarBox.height+1);
  const workspaceY=await workspace.evaluate(el=>el.getBoundingClientRect().y);
  await page.locator('#compare-mobile-metrics-toggle').click();await expect(metrics).toBeVisible();await expect(page.locator('#compare-catalog .compare-category[open]')).toHaveCount(0);
  const metricsStyle=await metrics.evaluate(el=>{const s=getComputedStyle(el);return {position:s.position,maxHeight:s.maxHeight}});expect(metricsStyle.position).toBe('fixed');expect(parseFloat(metricsStyle.maxHeight)).toBeGreaterThan(0);expect(Math.abs((await workspace.evaluate(el=>el.getBoundingClientRect().y))-workspaceY)).toBeLessThanOrEqual(1);
