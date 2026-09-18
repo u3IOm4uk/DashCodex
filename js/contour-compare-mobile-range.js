@@ -48,8 +48,60 @@ function setSettingsOpen(open){
  settingsBody.inert=mobileSettings()&&!open;
 }
 if(settingsToggle){
- settingsToggle.addEventListener('click',()=>setSettingsOpen(!settings.classList.contains('is-open')));
- let previousScroll=workspace.scrollTop;
+ const PULL_START=10,PULL_OPEN=92,PULL_MAX=176;
+ let previousScroll=workspace.scrollTop,touchAnchorY=null,pullDistance=0,pulling=false;
+ const clearPullVisual=()=>{
+  settings.classList.remove('is-pulling');
+  for(const name of ['--compare-settings-pull','--compare-settings-pull-opacity','--compare-settings-pull-shift','--compare-settings-pull-rotation'])settings.style.removeProperty(name);
+  pullDistance=0;pulling=false;
+ };
+ const showPull=distance=>{
+  const resisted=Math.min(PULL_MAX,Math.max(0,distance-PULL_START)*.72);
+  const progress=Math.min(1,resisted/PULL_OPEN);
+  pullDistance=resisted;pulling=resisted>0;
+  if(!pulling)return;
+  settings.classList.add('is-pulling');
+  settings.style.setProperty('--compare-settings-pull',resisted+'px');
+  settings.style.setProperty('--compare-settings-pull-opacity',String(.12+.88*progress));
+  settings.style.setProperty('--compare-settings-pull-shift',Math.min(10,resisted*.08)+'px');
+  settings.style.setProperty('--compare-settings-pull-rotation',(90*progress)+'deg');
+ };
+ const finishPull=()=>{
+  touchAnchorY=null;
+  if(!pulling)return;
+  const shouldOpen=pullDistance>=PULL_OPEN;
+  settings.classList.remove('is-pulling');
+  if(shouldOpen){
+   requestAnimationFrame(()=>{setSettingsOpen(true);clearPullVisual()});
+  }else{
+   requestAnimationFrame(()=>{
+    settings.style.setProperty('--compare-settings-pull','0px');
+    settings.style.setProperty('--compare-settings-pull-opacity','0');
+    settings.style.setProperty('--compare-settings-pull-shift','0px');
+    settings.style.setProperty('--compare-settings-pull-rotation','0deg');
+    setTimeout(clearPullVisual,680);
+   });
+  }
+ };
+ settingsToggle.addEventListener('click',()=>{clearPullVisual();setSettingsOpen(!settings.classList.contains('is-open'))});
+ let touchActive=false;
+ workspace.addEventListener('touchstart',event=>{
+  if(!mobileSettings()||settings.classList.contains('is-open')||event.touches.length!==1)return;
+  touchActive=true;pulling=false;pullDistance=0;
+  touchAnchorY=workspace.scrollTop<=0?event.touches[0].clientY:null;
+ },{passive:true});
+ workspace.addEventListener('touchmove',event=>{
+  if(!touchActive||settings.classList.contains('is-open')||event.touches.length!==1)return;
+  const y=event.touches[0].clientY;
+  if(workspace.scrollTop>0){touchAnchorY=null;return}
+  if(touchAnchorY===null){touchAnchorY=y;return}
+  const distance=y-touchAnchorY;
+  if(distance<=PULL_START){if(pulling)showPull(0);return}
+  showPull(distance);
+  if(pulling)event.preventDefault();
+ },{passive:false});
+ workspace.addEventListener('touchend',()=>{touchActive=false;finishPull()},{passive:true});
+ workspace.addEventListener('touchcancel',()=>{touchActive=false;finishPull()},{passive:true});
  workspace.addEventListener('scroll',()=>{
   const current=workspace.scrollTop;
   if(mobileSettings()&&settings.classList.contains('is-open')&&current>8&&Math.abs(current-previousScroll)>1)setSettingsOpen(false);
@@ -57,7 +109,7 @@ if(settingsToggle){
  },{passive:true});
  addEventListener('resize',()=>{
   if(!settingsBody)return;
-  syncSettingsHeight();
+  clearPullVisual();syncSettingsHeight();
   settingsBody.inert=mobileSettings()&&!settings.classList.contains('is-open');
  });
  new ResizeObserver(()=>syncSettingsHeight()).observe(settingsBody);
