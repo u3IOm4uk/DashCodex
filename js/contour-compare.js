@@ -30,34 +30,42 @@ function syncMobileNavState(active){
 }
 
 function setCompareView(next,rerender=true){
- const target=next==='details'?'details':'chart',changed=activeView!==target;activeView=target;
+ const target=next==='details'?'details':next==='chart'?'chart':null,changed=activeView!==target;activeView=target;
  const chartPanel=$('#compare-chart-panel'),tablePanel=dialog.querySelector('.compare-table-panel'),chartHeading=chartPanel?.querySelector('.compare-fold-heading'),tableHeading=tablePanel?.querySelector('.panel-heading');
- chartPanel?.classList.toggle('is-collapsed',activeView!=='chart');
- tablePanel?.classList.toggle('is-collapsed',activeView!=='details');
- chartHeading?.setAttribute('aria-expanded',String(activeView==='chart'));
- tableHeading?.setAttribute('aria-expanded',String(activeView==='details'));
- if(activeView==='details'&&chart)disposeChart();
- if(rerender&&changed&&activeView==='chart'&&model&&range.from&&range.to)renderAnalysis();
+ const chartOpen=activeView==='chart',detailsOpen=activeView==='details';
+ chartPanel?.classList.toggle('is-collapsed',!chartOpen);
+ tablePanel?.classList.toggle('is-collapsed',!detailsOpen);
+ chartHeading?.setAttribute('aria-expanded',String(chartOpen));
+ tableHeading?.setAttribute('aria-expanded',String(detailsOpen));
+ if(!chartOpen&&chart)disposeChart();
+ if(rerender&&changed&&chartOpen&&model&&range.from&&range.to)renderAnalysis();
+}
+function toggleCompareView(view){setCompareView(activeView===view?null:view)}
+
+function bindCompareFoldHeading(heading,view){
+ if(!heading||heading.dataset.compareAccordionBound)return;
+ heading.dataset.compareAccordionBound='true';heading.dataset.compareView=view;heading.classList.add('compare-fold-heading');heading.setAttribute('role','button');heading.setAttribute('tabindex','0');
+ const activate=()=>toggleCompareView(view);
+ heading.addEventListener('click',event=>{const control=event.target.closest('button,input,select,a,summary,[role="button"]');if(control&&control!==heading)return;activate()});
+ heading.addEventListener('keydown',event=>{if(event.target===heading&&(event.key==='Enter'||event.key===' ')){event.preventDefault();activate()}});
 }
 
 function ensureCompareAccordion(){
- const workspace=dialog.querySelector('.compare-workspace'),chartNode=$('#compare-chart'),dataNote=$('#compare-data-note'),tablePanel=dialog.querySelector('.compare-table-panel');
+ const workspace=dialog.querySelector('.compare-workspace'),chartNode=$('#compare-chart'),dataNote=$('#compare-data-note'),tablePanel=dialog.querySelector('.compare-table-panel'),chartControls=dialog.querySelector('.compare-chart-controls');
  if(!workspace||!chartNode||!dataNote||!tablePanel)return;
  let chartPanel=$('#compare-chart-panel');
  if(!chartPanel){
   chartPanel=document.createElement('section');chartPanel.id='compare-chart-panel';chartPanel.className='panel compare-chart-panel';
-  const heading=document.createElement('button');heading.type='button';heading.className='panel-heading compare-fold-heading compare-chart-heading';heading.id='compare-chart-toggle';heading.setAttribute('aria-controls','compare-chart-body');heading.innerHTML='<div><h3>Графік</h3><p>Візуальне порівняння обраних показників</p></div><span class="compare-fold-chevron" aria-hidden="true">›</span>';
+  const heading=document.createElement('div');heading.className='panel-heading compare-chart-heading';heading.id='compare-chart-toggle';heading.setAttribute('aria-controls','compare-chart-body');heading.innerHTML='<div class="compare-fold-title"><h3>Графік</h3><p>Візуальне порівняння обраних показників</p></div><div class="compare-chart-heading-actions"><span class="compare-fold-chevron" aria-hidden="true">›</span></div>';
   const body=document.createElement('div');body.id='compare-chart-body';body.className='compare-chart-body';
-  chartNode.before(chartPanel);chartPanel.append(heading,body);body.append(chartNode,dataNote);
-  heading.addEventListener('click',()=>setCompareView('chart'));
+  chartNode.before(chartPanel);chartPanel.append(heading,body);body.append(chartNode,dataNote);bindCompareFoldHeading(heading,'chart');
  }
+ const chartHeading=chartPanel.querySelector('.compare-chart-heading'),chartActions=chartHeading?.querySelector('.compare-chart-heading-actions'),chartField=chartControls?.closest('.compare-field');
+ if(chartControls&&chartActions&&!chartActions.contains(chartControls)){chartActions.prepend(chartControls);chartField?.remove()}
  const tableHeading=tablePanel.querySelector('.panel-heading'),tableTitle=tableHeading?.querySelector('h3');
  if(tableTitle)tableTitle.textContent='Деталі';
- if(tableHeading&&!tableHeading.dataset.compareAccordionBound){
-  tableHeading.dataset.compareAccordionBound='true';tableHeading.classList.add('compare-fold-heading');tableHeading.setAttribute('role','button');tableHeading.setAttribute('tabindex','0');tableHeading.setAttribute('aria-controls','compare-table-head');
-  const chevron=document.createElement('span');chevron.className='compare-fold-chevron';chevron.setAttribute('aria-hidden','true');chevron.textContent='›';tableHeading.append(chevron);
-  const activate=()=>setCompareView('details');tableHeading.addEventListener('click',activate);tableHeading.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();activate()}});
- }
+ if(tableHeading&&!tableHeading.querySelector('.compare-fold-chevron')){const chevron=document.createElement('span');chevron.className='compare-fold-chevron';chevron.setAttribute('aria-hidden','true');chevron.textContent='›';tableHeading.append(chevron)}
+ tableHeading?.setAttribute('aria-controls','compare-table-head');bindCompareFoldHeading(tableHeading,'details');
  setCompareView(activeView,false);
 }
 
