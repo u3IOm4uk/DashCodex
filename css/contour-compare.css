@@ -70,9 +70,9 @@
 .compare-field input { height:34px; border:1px solid #58676b; border-radius:5px; background:#0e1416; color:var(--compare-text); padding:4px 8px; font:inherit; font-size:12px; }
 .compare-date-fields { display:flex; align-items:center; gap:6px; }
 .compare-date-fields input { width:130px; min-width:0; }
-.compare-toolbar .segmented { width:max-content; flex-wrap:nowrap; }
-.compare-toolbar .segmented button { min-height:34px; align-items:center; justify-content:center; }
-.compare-toolbar .segmented button[aria-pressed=true] { background:#3d4734; color:#eeeaaa; }
+.compare-toolbar .segmented,.compare-chart-heading .segmented { width:max-content; flex-wrap:nowrap; }
+.compare-toolbar .segmented button,.compare-chart-heading .segmented button { min-height:34px; align-items:center; justify-content:center; }
+.compare-toolbar .segmented button[aria-pressed=true],.compare-chart-heading .segmented button[aria-pressed=true] { background:#3d4734; color:#eeeaaa; }
 .compare-value-controls button { padding:5px 10px; font-size:11px; }
 .compare-chart-controls button { width:35px; height:34px; padding:5px; }
 .compare-chart-controls svg.icon { width:18px; height:18px; }
@@ -96,7 +96,11 @@
 .compare-chart-panel .panel-heading,.compare-table-panel > .panel-heading.compare-fold-heading { min-height:50px; margin:0; padding:12px 14px; border-bottom:1px solid var(--compare-line); }
 .compare-fold-heading h3 { font-size:17px; }
 .compare-fold-heading p { color:var(--compare-muted); font-size:12px; }
-button.compare-fold-heading { width:100%; border:0; background:transparent; color:inherit; font:inherit; text-align:left; cursor:pointer; }
+.compare-fold-heading[role=button] { width:100%; color:inherit; text-align:left; cursor:pointer; user-select:none; }
+.compare-chart-heading { display:flex; align-items:center; gap:12px; }
+.compare-chart-heading > .compare-fold-title { min-width:0; }
+.compare-chart-heading-actions { display:flex; align-items:center; gap:8px; margin-left:auto; flex:none; }
+.compare-chart-heading-actions .compare-fold-chevron { margin-left:2px; }
 .compare-table-panel > .compare-fold-heading { cursor:pointer; user-select:none; }
 .compare-fold-chevron { margin-left:auto; color:var(--compare-muted); font-size:20px; line-height:1; transition:transform .15s ease; }
 .compare-chart-panel:not(.is-collapsed) .compare-fold-chevron,.compare-table-panel:not(.is-collapsed) > .panel-heading .compare-fold-chevron { transform:rotate(90deg); color:var(--gold); }
@@ -136,7 +140,6 @@ button.compare-fold-heading { width:100%; border:0; background:transparent; colo
   .compare-field { flex:1 1 100%; }
   .compare-date-fields input { width:100%; }
   .compare-field:has(.compare-value-controls) { flex:1 1 auto; }
-  .compare-field:has(.compare-chart-controls) { flex:0 0 auto; margin-left:auto; }
   .compare-presets { flex-wrap:wrap; }
   .compare-presets button { flex:1 1 auto; }
   .compare-selection { flex-wrap:nowrap; overflow-x:auto; padding:12px 12px 2px; }
